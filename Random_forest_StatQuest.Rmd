@@ -7,6 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(randomForest)
 ```
 
 ```{r}
@@ -60,10 +63,40 @@ data$hd <- as.factor(data$hd)
 ```
 
 Impute missing data
-First argument to rfImpute is hd~. which means that the hd column to be predicted by the data in all of the other columns
+First argument to rfImpute is hd~. which means that the hd column to be predicted by the data in all of the other columns. Iter argument is used to specify the number of random forests rfImpute should build to estimate the missing values. In theory 4-6 iterations is enough.
 ```{r}
 set.seed(42)
 
 data.imputed <- rfImpute(hd ~ ., data = data, iter = 6)
+```
+
+The OOB is the out of bag error rate. This should get smaller if the error rate is improving, if it doesn't we can conclude that the estimates are as good as they are going to be with this method.
+
+We also want the random forest to return the proximity matrix
+```{r}
+model <- randomForest(hd~., data = data.imputed, proximity = T)
+model
+```
+
+Built to classify samples. If used to predict weight/height, type of random forest would have been regression. If completely omitted, it would have said "unsupervised."
+The OOB estimate of error rate tells us that 83.5% of the OOB samples were correctly classified by the random forest.
+
+
+CMDS stands for classical multi dimensional scale
+```{r}
+distance.matrix <- dist(1-model$proximity)
+mds.stuff <- cmdscale(distance.matrix, eig = T, x.ret = T)
+mds.var.per <- round(mds.stuff$eig/sum(mds.stuff$eig)*100,1)
+
+mds.values <- mds.stuff$points
+
+mds.data <- data.frame(Sample = rownames(mds.values),
+                       X = mds.values[,1],
+                       Y = mds.values[,2],
+                       Status = data.imputed$hd)
+ggplot(data=mds.data, aes(x=X, y=Y, label = Sample)) +
+  geom_text(aes(color = Status)) +
+  theme_bw()+
+  xlab(paste("MDS1 - ", mds.var.per[1], "%", sep = "")) + ylab(paste("MDS2 - ", mds.var.per[2], "%", sep = "")) + ggtitle("MDS plot using (1 - Random Forest Proximities)")
 ```
 
