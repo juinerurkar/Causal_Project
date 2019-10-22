@@ -1,0 +1,19 @@
+---
+title: "Causal_Project"
+author: "Nerurkar Jui A"
+date: "10/21/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+url = "http://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
+
+data = read.csv(url, header = FALSE)
+
+head(data)
+```
+
