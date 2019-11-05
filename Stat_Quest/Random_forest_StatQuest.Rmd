@@ -75,7 +75,9 @@ The OOB is the out of bag error rate. This should get smaller if the error rate 
 We also want the random forest to return the proximity matrix
 ```{r}
 model <- randomForest(hd~., data = data.imputed, proximity = T)
-model
+data$prediction = model$predicted
+(sum(data$hd == data$prediction))/nrow(data)
+model$y[1:10]
 ```
 
 Built to classify samples. If used to predict weight/height, type of random forest would have been regression. If completely omitted, it would have said "unsupervised."
