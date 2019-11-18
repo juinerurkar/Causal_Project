@@ -7,6 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+require(dplyr)
 ```
 
 ```{r}
@@ -34,6 +35,8 @@ Y1 <- X_mat%*%beta + tau + rnorm(n, 0, 1)
 Y0 <- X_mat%*%beta + rnorm(n,0,1)
 
 mean(Y1) - mean(Y0)
+
+colnames(X_mat) = c('beta0','Weight', 'Age', 'BMI', 'Size_Tumor', 'Gender', 'HBP', 'Relapse')
 ```
 
 ```{r}
@@ -47,4 +50,20 @@ hist(Xi[,2])
 hist(Xi[,3])
 hist(Xi[,4])
 ```
+
+```{r}
+researchData <- data.frame(X_mat,treat,Y = ifelse(treat == 1,Y1,Y0)) %>% select(-beta0)
+godData <- data.frame(X_mat,treat,Y1,Y0) %>% select(-beta0)
+```
+
+
+
+
+
+
+
+
+
+
+
 
