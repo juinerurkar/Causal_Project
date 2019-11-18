@@ -23,8 +23,9 @@ beta <- rnorm(p+1, 0,1)
 # vector of slopes for the 5 covariates to generate tau
 gamma <- rnorm(p+1, 0, 0.5)
 
-tau <- X2%*%gamma + rnorm(N, 0, 0.5)
-Y <- X2%*%beta + tau*treatment + rnorm(N, 0, 1)
+tau <- X_mat%*%gamma 
+Y0 <- X_mat%*%beta + tau + rnorm(n, 0, 1)
+Y1 <- X_mat%*%beta + rnorm(n,0,1)
 ```
 
 ```{r}
