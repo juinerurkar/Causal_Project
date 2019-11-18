@@ -12,10 +12,16 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 set.seed(1234)
 n <- 10000
-p <- 5
+p <- 7
 treat <- sample(0:1, n, replace = T)
-Xi <- matrix(rnorm(n*p), n, p)
-X_mat <- cbind(rep(1, n),Xi)
+# create the covariates such that they are normalized
+Xi <- matrix(NA,n,p-3)
+Xi[,1] <- rnorm(n,175,10)
+Xi[,2] <- rnorm(n,50,5)
+Xi[,3] <- (rbeta(n,2,10)) * 15 + 24
+Xi[,4] <- (rnorm(n,5,1))
+
+X_mat <- cbind(rep(1, n),Xi,rbinom(10000,1,0.52),rbinom(10000,1,0.7),rbinom(10000,1,0.2))
 
 # Parameters 
 # beta - vector of slopes for the 5 covariates to generate Y
@@ -23,8 +29,11 @@ beta <- rnorm(p+1, 0,1)
 # vector of slopes for the 5 covariates to generate tau
 gamma <- rnorm(p+1, 0, 0.5)
 
-tau <- X2%*%gamma + rnorm(N, 0, 0.5)
-Y <- X2%*%beta + tau*treatment + rnorm(N, 0, 1)
+tau <- X_mat%*%gamma 
+Y1 <- X_mat%*%beta + tau + rnorm(n, 0, 1)
+Y0 <- X_mat%*%beta + rnorm(n,0,1)
+
+mean(Y1) - mean(Y0)
 ```
 
 ```{r}
@@ -32,6 +41,10 @@ hist(tau)
 ```
 
 ```{r}
-
+par(mfrow = c(2,2))
+hist(Xi[,1])
+hist(Xi[,2])
+hist(Xi[,3])
+hist(Xi[,4])
 ```
 
