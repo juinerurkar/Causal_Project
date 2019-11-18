@@ -12,11 +12,16 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 set.seed(1234)
 n <- 10000
-p <- 5
-treat <- sample(0:1, n, replace = T)
-Xi <- matrix(rnorm(n*p), n, p)
-X_mat <- cbind(rep(1, n),Xi)
+p <- 7
 
+Xi <- matrix(NA, n, p-3)
+Xi[,1] <- rnorm(n,175,10)
+Xi[,2] <- rnorm(n,50,5)
+Xi[,3] <- (rbeta(n,2,10)) * 15 + 24
+Xi[,4] <- (rnorm(n,5,1))
+
+X_mat <- cbind(rep(1, n),Xi, rbinom(10000, 1, 0.52), rbinom(10000, 1, 0.7), rbinom(10000, 1, 0.2))
+colnames(X_mat) = c('beta0','Weight', 'Age', 'BMI', 'Size_Tumor', 'Gender', 'HBP', 'Relapse')
 # Parameters 
 # beta - vector of slopes for the 5 covariates to generate Y
 beta <- rnorm(p+1, 0,1)
@@ -24,15 +29,18 @@ beta <- rnorm(p+1, 0,1)
 gamma <- rnorm(p+1, 0, 0.5)
 
 tau <- X_mat%*%gamma 
-Y0 <- X_mat%*%beta + tau + rnorm(n, 0, 1)
-Y1 <- X_mat%*%beta + rnorm(n,0,1)
+Y1 <- X_mat%*%beta + tau + rnorm(n, 0, 1)
+Y0 <- X_mat%*%beta + rnorm(n,0,1)
 ```
 
 ```{r}
 hist(tau)
 ```
 
+Researcher's role:
+Assign treatment and generate new data
 ```{r}
-
+treat <- sample(0:1, n, replace = T)
+data <- data.frame()
 ```
 
