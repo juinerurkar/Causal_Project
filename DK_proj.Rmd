@@ -65,9 +65,10 @@ fit_lm <- lm(Y ~ Gender + Weight + Age + BMI + Size_Tumor + HBP + Relapse + trea
 summary(fit_lm)
 ```
 
-# Just directly do bayesian causal forests and causal forests
+# Causal Forest
 
 ```{r}
 
 ```
 
+# Bayesian Causal Forest
