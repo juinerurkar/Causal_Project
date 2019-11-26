@@ -16,13 +16,17 @@ n <- 10000
 p <- 7
 treat <- sample(0:1, n, replace = T)
 # create the covariates such that they are normalized
-Xi <- matrix(NA,n,p-3)
-Xi[,1] <- rnorm(n,175,10)
-Xi[,2] <- rnorm(n,50,5)
-Xi[,3] <- Xi[,1]/7 + 2 + rnorm(n)
-Xi[,4] <- (rnorm(n,5,1))
+Xi <- matrix(NA,n,p)
 
-X_mat <- cbind(rep(1, n),Xi,rbinom(10000,1,0.52),rbinom(10000,1,0.7),rbinom(10000,1,0.2))
+Xi[,1] <-  rbinom(10000,1,0.52) # Gender
+Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
+Xi[,3] <- rnorm(n,50,5)# Age
+Xi[,4] <- Xi[,2]/7 + 2 + rnorm(n) # BMI
+Xi[,5] <- (rnorm(n,5,1)) # Tumor Size
+Xi[,6] <- rbinom(10000,1,0.7) # HBP
+Xi[,7] <- rbinom(10000,1,0.2) # Relapse
+
+X_mat <- cbind(rep(1, n),Xi)
 
 # Parameters 
 # beta - vector of slopes for the 5 covariates to generate Y
@@ -36,7 +40,7 @@ Y0 <- X_mat%*%beta + rnorm(n,0,1)
 
 mean(Y1) - mean(Y0)
 
-colnames(X_mat) = c('beta0','Weight', 'Age', 'BMI', 'Size_Tumor', 'Gender', 'HBP', 'Relapse')
+colnames(X_mat) = c('beta0','Gender','Weight', 'Age', 'BMI', 'Size_Tumor', 'HBP', 'Relapse')
 ```
 
 ```{r}
