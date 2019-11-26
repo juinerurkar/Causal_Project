@@ -65,10 +65,23 @@ fit_lm <- lm(Y ~ Gender + Weight + Age + BMI + Size_Tumor + HBP + Relapse + trea
 summary(fit_lm)
 ```
 
+# Creating a Train/Test split
+```{r}
+rows <- sample(nrow(researcher_data),size = 8000,replace = F)
+train_data <- researcher_data[rows,]
+test_data <- researcher_data[-rows,]
+```
+
 # Causal Forest
 
 ```{r}
-
+fit_cf <- causal_forest(X = train_data[,1:7],Y = train_data$Y, W = train_data$treat)
+cf.pred <- predict(fit_cf, test_data[,1:7])
 ```
+
+```{r}
+plot(density(cf.pred$predictions))
+```
+
 
 # Bayesian Causal Forest
