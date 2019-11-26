@@ -41,11 +41,6 @@ Y1 <- (X_mat/100)%*%beta + tau + rnorm(n, 0, 1)
 ```{r}
 hist(tau)
 mean(tau)
-god_data <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1, Y0 = Y0)
-plot(god_data$Weight, tau)
-plot(god_data$Age, tau)
-plot(god_data$BMI, tau)
-plot(god_data$Size_Tumor, tau)
 ```
 
 Researcher's role:
@@ -54,6 +49,12 @@ Assign treatment and generate new data
 ```{r}
 treat = rbinom(n, 1, 0.5)
 researcher_data  <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1, Y0))
+god_data <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1, Y0 = Y0)
+
+plot(god_data$Weight, tau,col = treat+1)
+plot(god_data$Age, tau,col = treat+1)
+plot(god_data$BMI, tau,col = treat+1)
+plot(god_data$Size_Tumor, tau,col = treat+1)
 ```
 
 
