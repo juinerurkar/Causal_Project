@@ -23,8 +23,8 @@ Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
 Xi[,3] <- rnorm(n,50,5)# Age
 Xi[,4] <- Xi[,2]/7 + 2 + rnorm(n) # BMI
 Xi[,5] <- (rnorm(n,5,1)) # Tumor Size
-Xi[,6] <- rbinom(10000,1,0.7) # HBP
-Xi[,7] <- rbinom(10000,1,0.2) # Relapse
+Xi[,6] <- rbinom(10000, 1, 0.7) # HBP
+Xi[,7] <- rbinom(10000,1,(Xi[,5]-min(Xi[,5]))/(max(Xi[,5])-min(Xi[,5]))) # Relapse
 
 X_mat <- cbind(rep(1, n),Xi)
 
