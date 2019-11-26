@@ -20,7 +20,7 @@ Xi <- matrix(NA,n,p-3)
 Xi[,1] <- rnorm(n,175,10)
 Xi[,2] <- rnorm(n,50,5)
 Xi[,3] <- (rbeta(n,2,10)) * 15 + 24
-Xi[,4] <- (rnorm(n,5,1))
+Xi[,4] <- Xi[,1]/7 + 2 + rnorm(n)
 
 X_mat <- cbind(rep(1, n),Xi,rbinom(10000,1,0.52),rbinom(10000,1,0.7),rbinom(10000,1,0.2))
 
