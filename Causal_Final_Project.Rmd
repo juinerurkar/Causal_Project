@@ -13,15 +13,9 @@ knitr::opts_chunk$set(echo = TRUE)
 set.seed(1234)
 n <- 10000
 p <- 7
-##The features need to be correlated - Bayesian causal forests better than causal forests.
 
 # create the covariates such that they are normalized
 Xi <- matrix(NA,n,p)
-
-#Xi[,1] <- rnorm(n,175,10)
-#Xi[,2] <- rnorm(n,Xi[,1]/4,5)
-#Xi[,3] <- (rbeta(n,2,10)) * 15 + 24
-#Xi[,4] <- (rnorm(n,Xi[,1]/30,1))
 
 Xi[,1] <-  rbinom(10000,1,0.52) # Gender
 Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
@@ -34,9 +28,9 @@ Xi[,7] <- rbinom(10000,1,(Xi[,5]-min(Xi[,5]))/(max(Xi[,5])-min(Xi[,5]))) # Relap
 X_mat <- cbind(rep(1, n),Xi)
 colnames(X_mat) = c('beta0','Gender','Weight', 'Age', 'BMI', 'Size_Tumor','HBP', 'Relapse')
 # Parameters 
-# beta - vector of slopes for the 5 covariates to generate Y
+# beta - vector of slopes for the covariates to generate Y
 beta <- c(-0.98, 0.803, 2.2, 1.17, 0.77, 0.027, 1.18, 0.187)
-# vector of slopes for the 5 covariates to generate tau
+# vector of slopes for the covariates to generate tau
 gamma <- c(-7, 0.064, 0.0099, 0.0303, 0.0124, 0.523, -0.0099, -0.00288)
 
 tau <- X_mat%*%gamma 
