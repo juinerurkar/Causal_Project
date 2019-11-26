@@ -7,6 +7,8 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(grf)
+library(bcf)
 ```
 
 ```{r}
@@ -41,11 +43,6 @@ Y1 <- (X_mat/100)%*%beta + tau + rnorm(n, 0, 1)
 ```{r}
 hist(tau)
 mean(tau)
-god_data <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1, Y0 = Y0)
-plot(god_data$Weight, tau)
-plot(god_data$Age, tau)
-plot(god_data$BMI, tau)
-plot(god_data$Size_Tumor, tau)
 ```
 
 Researcher's role:
@@ -54,12 +51,45 @@ Assign treatment and generate new data
 ```{r}
 treat = rbinom(n, 1, 0.5)
 researcher_data  <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1, Y0))
+god_data <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1, Y0 = Y0)
+
+plot(god_data$Weight, tau,col = treat+1)
+plot(god_data$Age, tau,col = treat+1)
+plot(god_data$BMI, tau,col = treat+1)
+plot(god_data$Size_Tumor, tau,col = treat+1)
 ```
 
+# Linear Model
 
-###Just directly do bayesian causal forests and causal forests
+```{r}
+fit_lm <- lm(Y ~ Gender + Weight + Age + BMI + Size_Tumor + HBP + Relapse + treat,data = researcher_data)
+summary(fit_lm)
+```
+
+#Train - test split approach
+
+```{r}
+rows <- sample(nrow(researcher_data),size = 8000,replace = F)
+train_data <- researcher_data[rows,]
+test_data <- researcher_data[-rows,]
+```
+
+# Causal Forest
 
 ```{r}
 
+```
+
+# Bayesian Causal Forest
+
+```{r}
+fit_bayesian <- bcf(train_data$Y, train_data$treat, as.matrix(train_data[,1:7]), as.matrix(train_data[,1:7]), rep(0.5, 8000), nburn = 2000, nsim = 2000)
+```
+
+```{r}
+# Get posterior of treatment effects
+tau_post = fit_bayesian$tau
+tauhat = colMeans(tau_post)
+hist(tauhat)
 ```
 
