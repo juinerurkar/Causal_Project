@@ -8,6 +8,7 @@ output: pdf_document
 ```{r setup, include=FALSE,echo=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 require(grf)
+require(bcf)
 ```
 
 ```{r}
@@ -65,7 +66,7 @@ fit_lm <- lm(Y ~ Gender + Weight + Age + BMI + Size_Tumor + HBP + Relapse + trea
 summary(fit_lm)
 ```
 
-# Creating a Train/Test split
+### Creating a Train/Test split
 ```{r}
 rows <- sample(nrow(researcher_data),size = 8000,replace = F)
 train_data <- researcher_data[rows,]
@@ -83,5 +84,16 @@ cf.pred <- predict(fit_cf, test_data[,1:7])
 plot(density(cf.pred$predictions))
 ```
 
-
 # Bayesian Causal Forest
+
+
+
+
+
+
+
+
+
+
+
+
