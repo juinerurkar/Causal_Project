@@ -38,7 +38,8 @@ tau <- X_mat%*%gamma
 Y1 <- X_mat%*%beta + tau + rnorm(n, 0, 1)
 Y0 <- X_mat%*%beta + rnorm(n,0,1)
 
-mean(Y1) - mean(Y0)
+mean(Y1)
+mean(Y0)
 
 colnames(X_mat) = c('beta0','Gender','Weight', 'Age', 'BMI', 'Size_Tumor', 'HBP', 'Relapse')
 ```
@@ -49,10 +50,10 @@ hist(tau)
 
 ```{r}
 par(mfrow = c(2,2))
-hist(Xi[,1])
 hist(Xi[,2])
 hist(Xi[,3])
 hist(Xi[,4])
+hist(Xi[,5])
 ```
 
 ```{r}
