@@ -45,11 +45,13 @@ hist(tau)
 mean(tau)
 ```
 
-Researcher's role:
-Treatment assignment was completely random
-Assign treatment and generate new data
 ```{r}
-treat = rbinom(n, 1, 0.5)
+q = ifelse(X_mat[,6] < 4, -1, 1)
+pi = pnorm(q)
+treat = rbinom(n, 1, pi)
+```
+
+```{r}
 researcher_data  <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1, Y0))
 god_data <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1, Y0 = Y0)
 
@@ -86,7 +88,16 @@ plot(density(cf.pred$predictions))
 
 # Bayesian Causal Forest
 
+```{r}
+fit_bayesian <- bcf(train_data$Y, train_data$treat, as.matrix(train_data[,1:7]), as.matrix(train_data[,1:7]), rep(0.5, 8000), nburn = 2000, nsim = 2000)
+```
 
+```{r}
+# Get posterior of treatment effects
+tau_post = fit_bayesian$tau
+tauhat = colMeans(tau_post)
+hist(tauhat)
+```
 
 
 
