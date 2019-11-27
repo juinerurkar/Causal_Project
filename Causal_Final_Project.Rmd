@@ -1,6 +1,6 @@
 ---
 title: "Causal_Project"
-author: "Nerurkar Jui A"
+author: "Devin Khosla and Jui Nerurkar"
 date: "11/4/2019"
 output: pdf_document
 ---
@@ -16,9 +16,10 @@ set.seed(1234)
 n <- 10000
 p <- 7
 
-# create the covariates such that they are normalized
+#Create a matrix to store the covariates
 Xi <- matrix(NA,n,p)
 
+#Create the covariates
 Xi[,1] <-  rbinom(10000,1,0.52) # Gender
 Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
 Xi[,3] <- rnorm(n,50,5)# Age
@@ -27,63 +28,81 @@ Xi[,5] <- (rnorm(n,5,1)) # Tumor Size
 Xi[,6] <- rbinom(10000, 1, 0.7) # HBP
 Xi[,7] <- rbinom(10000,1,(Xi[,5]-min(Xi[,5]))/(max(Xi[,5])-min(Xi[,5]))) # Relapse
  
+#Add a first column with 1s for the intercept (beta0)
 X_mat <- cbind(rep(1, n),Xi)
-colnames(X_mat) = c('beta0','Gender','Weight', 'Age', 'BMI', 'Size_Tumor','HBP', 'Relapse')
-# Parameters 
-# beta - vector of slopes for the covariates to generate Y
-beta <- c(-0.98, 0.803, 2.2, 1.17, 0.77, 0.027, 1.18, 0.187)
-# vector of slopes for the covariates to generate tau
-gamma <- c(-7, 0.064, 0.0099, 0.0303, 0.0124, 0.523, -0.0099, -0.00288)
 
-tau <- X_mat%*%gamma 
+#Add column names
+colnames(X_mat) = c('beta0','Gender','Weight', 'Age', 'BMI', 'Size_Tumor','HBP', 'Relapse')
+
+# Parameters 
+# beta - vector of slopes to generate Y
+beta <- c(-0.98, -0.803, 2.2, 1.17, 0.77, 0.027, 1.18, 0.187)
+# vector of slopes to generate tau
+gamma <- c(45, 1.64, -0.099, -0.303, 0.0124, -1.523, 0.59, 0.8)
+
+#Generate tau, Y0 and Y1
+tau <- (X_mat)%*%gamma
 Y0 <- (X_mat/100)%*%beta + rnorm(n,0,1)
 Y1 <- (X_mat/100)%*%beta + tau + rnorm(n, 0, 1)
+
+##Outcomes Y0 and Y1 are a health measure which is expected to increase with treatment.
 ```
 
 ```{r}
+#Plot tau
 hist(tau)
 mean(tau)
+
+#The mean value of treatment effect is 6.844
 ```
 
-Researcher's role:
-Treatment assignment was completely random
-Assign treatment and generate new data
 ```{r}
-treat = rbinom(n, 1, 0.5)
+#Treatment assignment was not completely random. Targeted selection.
+q = ifelse(X_mat[,6] < 4, -1, 1)
+pi = pnorm(q)
+treat = rbinom(n, 1, pi)
+
+#Create researcher data and god role data
 researcher_data  <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1, Y0))
 god_data <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1, Y0 = Y0)
 
+#Plot to see relations between covariates and treatment effect
 plot(god_data$Weight, tau,col = treat+1)
 plot(god_data$Age, tau,col = treat+1)
 plot(god_data$BMI, tau,col = treat+1)
 plot(god_data$Size_Tumor, tau,col = treat+1)
 ```
 
-# Linear Model
 
 ```{r}
+# Linear Regression
 fit_lm <- lm(Y ~ Gender + Weight + Age + BMI + Size_Tumor + HBP + Relapse + treat,data = researcher_data)
 summary(fit_lm)
 ```
 
-#Train - test split approach
-
 ```{r}
+# Causal Forest
+
+#Create train - test split for researcher data
 rows <- sample(nrow(researcher_data),size = 8000,replace = F)
 train_data <- researcher_data[rows,]
 test_data <- researcher_data[-rows,]
 ```
 
-# Causal Forest
-
 ```{r}
-
+fit_cf <- causal_forest(X = train_data[,1:7],Y = train_data$Y, W = train_data$treat)
+cf.pred <- predict(fit_cf, test_data[,1:7])
 ```
 
-# Bayesian Causal Forest
+```{r}
+hist(cf.pred$predictions)
+mean(cf.pred$predictions)
+```
+
 
 ```{r}
-fit_bayesian <- bcf(train_data$Y, train_data$treat, as.matrix(train_data[,1:7]), as.matrix(train_data[,1:7]), rep(0.5, 8000), nburn = 2000, nsim = 2000)
+# Bayesian Causal Forest
+fit_bayesian <- bcf(researcher_data$Y, researcher_data$treat, as.matrix(researcher_data[,1:7]), pihat = pi, nburn = 2000, nsim = 2000)
 ```
 
 ```{r}
@@ -91,5 +110,14 @@ fit_bayesian <- bcf(train_data$Y, train_data$treat, as.matrix(train_data[,1:7]),
 tau_post = fit_bayesian$tau
 tauhat = colMeans(tau_post)
 hist(tauhat)
+mean(tauhat)
 ```
+
+```{r}
+#Overlapping histograms of tau and estimated tau using BCF
+hist(tauhat, col = rgb(1,0,0, alpha = 0.7))
+hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
+```
+
+
 
