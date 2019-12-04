@@ -9,12 +9,13 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(grf)
 library(bcf)
+library(arm)
 ```
 
 ```{r}
 set.seed(1234)
 n <- 10000
-p <- 7
+p <- 6
 
 
 #Create a matrix to store the covariates
@@ -22,12 +23,12 @@ Xi <- matrix(NA,n,p)
 
 #Create the covariates
 Xi[,1] <-  rbinom(10000,1,0.52) # Gender
-Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
-Xi[,3] <- rnorm(n,50,5)# Age
-Xi[,4] <- Xi[,2]/7 + 2 + rnorm(n) # BMI
-Xi[,5] <- (rnorm(n,5,1)) # Tumor Size
-Xi[,6] <- rbinom(10000, 1, 0.7) # HBP
-Xi[,7] <- rbinom(10000,1,(Xi[,5]-min(Xi[,5]))/(max(Xi[,5])-min(Xi[,5]))) # Relapse
+#Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
+Xi[,2] <- rnorm(n,50,5)# Age
+Xi[,3] <- Xi[,2]/2.5 + Xi[,1] + rnorm(n) # BMI
+Xi[,4] <- (rnorm(n,5,1)) # Tumor Size
+Xi[,5] <- rbinom(10000, 1, (Xi[,3] - min(Xi[,3]))/35 ) # HBP
+Xi[,6] <- rbinom(10000,1,(Xi[,3]-min(Xi[,3]))/(max(Xi[,3])-min(Xi[,3]))) # Relapse
 
 ```
 
@@ -36,16 +37,17 @@ Xi[,7] <- rbinom(10000,1,(Xi[,5]-min(Xi[,5]))/(max(Xi[,5])-min(Xi[,5]))) # Relap
 X_mat <- cbind(rep(1, n),Xi)
 
 #Add column names
-colnames(X_mat) = c('beta0','Gender','Weight', 'Age', 'BMI', 'Size_Tumor','HBP', 'Relapse')
+colnames(X_mat) = c('beta0','Gender','Age', 'BMI', 'Size_Tumor','HBP', 'Relapse')
 
 # Parameters 
 # beta - vector of slopes to generate Y
-beta <- c(-0.98, -0.803, 2.2, 1.17, 0.77, 0.027, 1.18, 0.187)
+beta <- c(-0.98, -0.803,1.17, 0.77, 0.027, 1.18, 0.187)
 # vector of slopes to generate tau
-gamma <- c(45, 1.64, -0.099, -0.303, 0.0124, -1.523, 0.59, 0.8)
+gamma <- c(30, 1.64, -0.303, 0.0124, -1.523, 0.59, 0.8)
 
 #Generate tau, Y0 and Y1
 tau <- (X_mat)%*%gamma
+
 ```
 
 ```{r}
@@ -58,9 +60,9 @@ Y1_lin <- (X_mat)%*%beta + tau + rnorm(n, 0, 1)
 
 ```{r}
 #Non linear data generation process
-Y0_nl <- X_mat[,1]*-0.98 + X_mat[,2]*-0.803 + X_mat[,3]*runif(n, 1, 5) + X_mat[,4]*1.17 + X_mat[,5]*0.77 + X_mat[,6]*runif(n, 0.02, 0.05) + X_mat[,7]*1.18 + X_mat[,8]*runif(n, 0.1, 0.2)+ rnorm(n,0,1)
+Y0_nl <- X_mat[,1]*-0.98 + X_mat[,2]*-0.803 + X_mat[,3]*1.17 + X_mat[,4]*log(seq(4,n+3, 1)) + X_mat[,5]*runif(n, 1, 20) + X_mat[,6]*1.18 + X_mat[,7]*runif(n, 0.1, 2)+ rnorm(n,0,1)
 
-Y1_nl <- X_mat[,1]*-0.98 + X_mat[,2]*-0.803 + X_mat[,3]*runif(n, 1, 5) + X_mat[,4]*1.17 + X_mat[,5]*0.77 + X_mat[,6]*runif(n, 0.02, 0.05) + X_mat[,7]*1.18 + X_mat[,8]*runif(n, 0.1, 0.2)+ tau + rnorm(n,0,1)
+Y1_nl <- X_mat[,1]*-0.98 + X_mat[,2]*-0.803 + X_mat[,3]*1.17 + X_mat[,4]*log(seq(4,n+3, 1)) + X_mat[,5]*runif(n, 1, 20) + X_mat[,6]*1.18 + X_mat[,7]*runif(n, 0.1, 2)+ tau + rnorm(n,0,1)
 ```
 
 
@@ -72,8 +74,9 @@ mean(tau)
 ```
 
 ```{r}
+#'beta0','Gender','Age', 'BMI', 'Size_Tumor','HBP', 'Relapse'
 #Treatment assignment was not completely random. Targeted selection.
-q = ifelse(X_mat[,2] < 170 & X_mat[,3] > 40 & X_mat[,5] < 4 & X_mat[,7] == 0, -1, 1)
+q = ifelse(X_mat[,3] > 40 & X_mat[,4] < 18 & X_mat[,5] < 4 & X_mat[,7] == 0, -1, 1)
 pi = pnorm(q)
 treat = rbinom(n, 1, pi)
 ```
@@ -91,13 +94,13 @@ god_nl <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_nl, Y0 = Y0_nl)
 
 ```{r}
 # Linear Regression with linear data
-fit_lin <- lm(Y ~ Gender + Weight + Age + BMI + Size_Tumor + HBP + Relapse + treat,data = researcher_lin)
+fit_lin <- lm(Y ~ Gender + Age + BMI + Size_Tumor + HBP + Relapse + treat,data = researcher_lin)
 summary(fit_lin)
 ```
 
 ```{r}
 # Linear Regression with non linear data
-fit_nl <- lm(Y ~ Gender + Weight + Age + BMI + Size_Tumor + HBP + Relapse + treat,data = researcher_nl)
+fit_nl <- lm(Y ~ Gender + Age + BMI + Size_Tumor + HBP + Relapse + treat,data = researcher_nl)
 summary(fit_nl)
 ```
 
@@ -117,12 +120,12 @@ test_nl <- researcher_nl[-rows_nl,]
 
 ```{r}
 #Causal forest with linear data
-fit_cf_lin <- causal_forest(X = train_lin[,1:7],Y = train_lin$Y, W = train_lin$treat)
-cf.pred_lin <- predict(fit_cf_lin, test_lin[,1:7])
+fit_cf_lin <- causal_forest(X = train_lin[,1:6],Y = train_lin$Y, W = train_lin$treat)
+cf.pred_lin <- predict(fit_cf_lin, test_lin[,1:6])
 
 #Causal forest with non linear data
-fit_cf_nl <- causal_forest(X = train_nl[,1:7],Y = train_nl$Y, W = train_nl$treat)
-cf.pred_nl <- predict(fit_cf_nl, test_nl[,1:7])
+fit_cf_nl <- causal_forest(X = train_nl[,1:6],Y = train_nl$Y, W = train_nl$treat)
+cf.pred_nl <- predict(fit_cf_nl, test_nl[,1:6])
 ```
 
 ```{r}
@@ -135,10 +138,10 @@ mean(cf.pred_nl$predictions)
 
 ```{r}
 # Bayesian Causal Forest with linear data
-fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:7]), pihat = pi, nburn = 2000, nsim = 2000)
+fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
 
 # Bayesian Causal Forest with non linear data
-fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:7]), pihat = pi, nburn = 2000, nsim = 2000)
+fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
 ```
 
 
@@ -166,7 +169,7 @@ hist(tauhat_lin, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 2000))
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 
 #Overlapping histograms of tau and estimated tau using BCF - non linear data
-hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 2000))
+hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 4500), xlim = c(0, 15))
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 ```
 
