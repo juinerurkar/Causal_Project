@@ -59,17 +59,22 @@ Y1_lin <- (X_mat)%*%beta + tau + rnorm(n, 0, 1)
 ```
 
 ```{r}
+# 'beta0','Gender','Weight','Age','Size_Tumor','HBP', 'Relapse'
 #Non linear data generation process
-Y0_nl <- (X_mat[,1]*-0.98) + X_mat[,2]*-0.803 + X_mat[,3]*1.17 + X_mat[,4]*log(seq(4,n+3, 1)) + X_mat[,5]*runif(n, 1, 20) + X_mat[,6]*1.18 + X_mat[,7]*runif(n, 0.1, 2)+ rnorm(n,0,1)
+Y0_nl <- (X_mat[,1]*-0.98) + X_mat[,2]*-0.803 + log(X_mat[,3])*0.5 + 0.01*(X_mat[,4])^3 + exp(X_mat[,5])*0.005 + (X_mat[,6])*1.18 + (X_mat[,7]) + rnorm(n,0,1)
 
-Y1_nl <- (X_mat[,1]*-0.98) + X_mat[,2]*-0.803 + X_mat[,3]*1.17 + X_mat[,4]*log(seq(4,n+3, 1)) + X_mat[,5]*runif(n, 1, 20) + X_mat[,6]*1.18 + X_mat[,7]*runif(n, 0.1, 2)+ tau + rnorm(n,0,1)
+Y0_nl <- (X_mat[,1]*-0.98) + X_mat[,2]*-0.803 + X_mat[,3]*1.17 + (X_mat[,4])^2 + exp(X_mat[,5]) + X_mat[,6]*1.18 + log(X_mat[,7])+ rnorm(n,0,1) + tau
+
+plot(Y0_nl,X_mat[,3])
+plot(Y0_nl,X_mat[,4])
+plot(Y0_nl,X_mat[,5])
 ```
 
 ```{r}
 #Plot tau
 hist(tau)
 mean(tau)
-#The mean value of treatment effect is 6.844
+#The mean value of treatment effect is 13.98642
 ```
 
 ```{r}
