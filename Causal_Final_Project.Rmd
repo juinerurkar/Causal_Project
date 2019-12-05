@@ -95,22 +95,7 @@ researcher_nl <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1
 god_nl <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_nl, Y0 = Y0_nl)
 ```
 
-
 ```{r}
-# Linear Regression with linear data
-fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = researcher_lin)
-summary(fit_lin)
-```
-
-```{r}
-# Linear Regression with non linear data
-fit_nl <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = researcher_nl)
-summary(fit_nl)
-```
-
-```{r}
-# Causal Forest
-
 #Create train - test split for linear researcher data
 rows_lin <- sample(nrow(researcher_lin),size = 8000,replace = F)
 train_lin <- researcher_lin[rows_lin,]
@@ -120,6 +105,26 @@ test_lin <- researcher_lin[-rows_lin,]
 rows_nl <- sample(nrow(researcher_nl),size = 8000,replace = F)
 train_nl <- researcher_nl[rows_nl,]
 test_nl <- researcher_nl[-rows_nl,]
+```
+
+
+```{r}
+# Linear Regression with linear data
+fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = train_lin)
+summary(fit_lin)
+Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
+```
+
+```{r}
+# Linear Regression with non linear data
+fit_nl <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = train_nl)
+summary(fit_nl)
+Yhat_nl_lr <- predict.lm(fit_nl, test_nl, type = "response")
+```
+
+```{r}
+# Causal Forest
+
 ```
 
 ```{r}
@@ -177,5 +182,16 @@ hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 4500), xlim = c(5, 25
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 ```
 
+```{r}
+#Mean difference in real and estimated individual heterogeneous treatment effects for linear data
+mean_diff_lin_bcf = mean(fit_bayesian_lin$yhat - researcher_lin$Y)
+mean_diff_lin_cf = mean(fit_cf_lin$Y.hat - train_lin$Y)
+mean_diff_lin_lr = mean(Yhat_lin_lr - test_lin$Y)
+
+#Mean difference in real and estimated individual heterogeneous treatment effects for non - linear data
+mean_diff_nl_bcf = mean(fit_bayesian_nl$yhat - researcher_nl$Y)
+mean_diff_nl_cf = mean(fit_cf_nl$Y.hat - train_nl$Y)
+mean_diff_nl_lr = mean(Yhat_nl_lr - test_nl$Y)
+```
 
 
