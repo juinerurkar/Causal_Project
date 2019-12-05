@@ -22,13 +22,13 @@ p <- 6
 Xi <- matrix(NA,n,p)
 
 #Create the covariates
-Xi[,1] <-  rbinom(10000,1,0.52) # Gender
-#Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
-Xi[,2] <- rnorm(n,50,5)# Age
-Xi[,3] <- Xi[,2]/2.5 + Xi[,1] + rnorm(n) # BMI
+Xi[,1] <-  rbinom(n,1,0.52) # Gender
+Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
+Xi[,3] <- rnorm(n,50,5) # Age
+#Xi[,3] <- Xi[,2]/2.5 + Xi[,1] + rnorm(n) # BMI
 Xi[,4] <- (rnorm(n,5,1)) # Tumor Size
-Xi[,5] <- rbinom(10000, 1, (Xi[,3] - min(Xi[,3]))/35 ) # HBP
-Xi[,6] <- rbinom(10000,1,(Xi[,3]-min(Xi[,3]))/(max(Xi[,3])-min(Xi[,3]))) # Relapse
+Xi[,5] <- rbinom(n, 1, (Xi[,2] - min(Xi[,2]))/100 ) # HBP
+Xi[,6] <- rbinom(n,1,((Xi[,4]-min(Xi[,4]))/(max(Xi[,4])-min(Xi[,4])))) # Relapse
 
 ```
 
@@ -37,13 +37,13 @@ Xi[,6] <- rbinom(10000,1,(Xi[,3]-min(Xi[,3]))/(max(Xi[,3])-min(Xi[,3]))) # Relap
 X_mat <- cbind(rep(1, n),Xi)
 
 #Add column names
-colnames(X_mat) = c('beta0','Gender','Age', 'BMI', 'Size_Tumor','HBP', 'Relapse')
+colnames(X_mat) = c('beta0','Gender','Weight','Age','Size_Tumor','HBP', 'Relapse')
 
 # Parameters 
 # beta - vector of slopes to generate Y
-beta <- c(-0.98, -0.803,1.17, 0.77, 0.027, 1.18, 0.187)
+beta <- c(-0.98, -0.803,0.17, 0.77, 0.027, 1.18, 0.187)
 # vector of slopes to generate tau
-gamma <- c(30, 1.64, -0.303, 0.0124, -1.523, 0.59, 0.8)
+gamma <- c(30, 1.64, -0.060, 0.0124, -1.523, 0.59, 0.8)
 
 #Generate tau, Y0 and Y1
 tau <- (X_mat)%*%gamma
@@ -59,10 +59,11 @@ Y1_lin <- (X_mat)%*%beta + tau + rnorm(n, 0, 1)
 ```
 
 ```{r}
+#variables - 'beta0','Gender','Weight','Age','Size_Tumor','HBP', 'Relapse'
 #Non linear data generation process
-Y0_nl <- X_mat[,1]*-0.98 + X_mat[,2]*-0.803 + X_mat[,3]*1.17 + X_mat[,4]*log(seq(4,n+3, 1)) + X_mat[,5]*runif(n, 1, 20) + X_mat[,6]*1.18 + X_mat[,7]*runif(n, 0.1, 2)+ rnorm(n,0,1)
+Y0_nl <- 0.08*X_mat[,1]^2 + X_mat[,2]^2 + 0.00002*X_mat[,3]^3 + 0.00006*X_mat[,4]^4 + 0.04*exp(X_mat[,5]) + X_mat[,6]^3 + 0.187*X_mat[,7]^3 + rnorm(n,0,1)
 
-Y1_nl <- X_mat[,1]*-0.98 + X_mat[,2]*-0.803 + X_mat[,3]*1.17 + X_mat[,4]*log(seq(4,n+3, 1)) + X_mat[,5]*runif(n, 1, 20) + X_mat[,6]*1.18 + X_mat[,7]*runif(n, 0.1, 2)+ tau + rnorm(n,0,1)
+Y1_nl <- 0.08*X_mat[,1]^2 + 0.05*X_mat[,2]^2 + 0.00002*X_mat[,3]^3 + 0.00006*X_mat[,4]^4 + 0.04*exp(X_mat[,5]) + X_mat[,6]^3 + 0.187*X_mat[,7]^3 + rnorm(n,0,1) + tau
 ```
 
 
@@ -71,14 +72,17 @@ Y1_nl <- X_mat[,1]*-0.98 + X_mat[,2]*-0.803 + X_mat[,3]*1.17 + X_mat[,4]*log(seq
 hist(tau)
 mean(tau)
 #The mean value of treatment effect is 6.844
+range(tau)
 ```
 
 ```{r}
 #'beta0','Gender','Age', 'BMI', 'Size_Tumor','HBP', 'Relapse'
 #Treatment assignment was not completely random. Targeted selection.
-q = ifelse(X_mat[,3] > 40 & X_mat[,4] < 18 & X_mat[,5] < 4 & X_mat[,7] == 0, -1, 1)
+q = ifelse(X_mat[,4] > 40 & X_mat[,3] < 160 & X_mat[,5] < 4 & X_mat[,7] == 0, -1, 1)
 pi = pnorm(q)
 treat = rbinom(n, 1, pi)
+
+table(treat)
 ```
 
 ```{r}
@@ -94,13 +98,13 @@ god_nl <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_nl, Y0 = Y0_nl)
 
 ```{r}
 # Linear Regression with linear data
-fit_lin <- lm(Y ~ Gender + Age + BMI + Size_Tumor + HBP + Relapse + treat,data = researcher_lin)
+fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = researcher_lin)
 summary(fit_lin)
 ```
 
 ```{r}
 # Linear Regression with non linear data
-fit_nl <- lm(Y ~ Gender + Age + BMI + Size_Tumor + HBP + Relapse + treat,data = researcher_nl)
+fit_nl <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = researcher_nl)
 summary(fit_nl)
 ```
 
@@ -169,7 +173,7 @@ hist(tauhat_lin, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 2000))
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 
 #Overlapping histograms of tau and estimated tau using BCF - non linear data
-hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 4500), xlim = c(0, 15))
+hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 4500), xlim = c(5, 25))
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 ```
 
