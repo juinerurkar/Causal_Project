@@ -10,40 +10,46 @@ knitr::opts_chunk$set(echo = TRUE)
 library(grf)
 library(bcf)
 library(arm)
+library(mvtnorm)
 ```
 
 ```{r}
 set.seed(1234)
 n <- 10000
 p <- 6
-
-
-#Create a matrix to store the covariates
-Xi <- matrix(NA,n,p)
-
-#Create the covariates
-Xi[,1] <-  rbinom(n,1,0.52) # Gender
-Xi[,2] <- ifelse(Xi[,1] == 1, rnorm(n,185,10),rnorm(n,165,10)) # Weight
-Xi[,3] <- rnorm(n,50,5) # Age
-#Xi[,3] <- Xi[,2]/2.5 + Xi[,1] + rnorm(n) # BMI
-Xi[,4] <- (rnorm(n,5,1)) # Tumor Size
-Xi[,5] <- rbinom(n, 1, (Xi[,2] - min(Xi[,2]))/100 ) # HBP
-Xi[,6] <- rbinom(n,1,((Xi[,4]-min(Xi[,4]))/(max(Xi[,4])-min(Xi[,4])))) # Relapse
-
 ```
+
+
+```{r, warning = F, show = F, message = F}
+#Create strongly confounded data
+sigma_mat <- matrix(0, 4,4)
+sigma_mat[lower.tri(sigma_mat)] <- c(0.7, 0.8, 0.65, 0.9,0.92, 0.84)
+sigma_mat <- t(sigma_mat)
+sigma_mat[lower.tri(sigma_mat)] <- c(0.7, 0.8, 0.65, 0.9,0.92, 0.84)
+Sigma <- t(sigma_mat) %*% sigma_mat
+Sigma <- Sigma/1.5
+diag(Sigma) <- c(20, 1, 1, 1)
+
+#Weight, Age, Tumor Size, HBP
+Xi <- rmvnorm(n, c(170, 50, 5, 130), sigma= Sigma)
+
+Gender <- rbinom(n, 1, 0.52)
+Relapse <- rbinom(n,1,((Xi[,3]-min(Xi[,3]))/(max(Xi[,3])-min(Xi[,3]))))
+```
+
 
 ```{r}
 #Add a first column with 1s for the intercept (beta0)
-X_mat <- cbind(rep(1, n),Xi)
+X_mat <- cbind(rep(1,n), Xi, Gender, Relapse)
 
 #Add column names
-colnames(X_mat) = c('beta0','Gender','Weight','Age','Size_Tumor','HBP', 'Relapse')
+colnames(X_mat) = c('beta0','Weight','Age','Size_Tumor','HBP', 'Gender','Relapse')
 
 # Parameters 
 # beta - vector of slopes to generate Y
 beta <- c(-0.98, -0.803,0.17, 0.77, 0.027, 1.18, 0.187)
 # vector of slopes to generate tau
-gamma <- c(30, 1.64, -0.060, 0.0124, -1.523, 0.59, 0.8)
+gamma <- c(16, -0.060, 0.0124, -1.523, 0.1,  0.64, 0.8)
 
 #Generate tau, Y0 and Y1
 tau <- (X_mat)%*%gamma
@@ -59,11 +65,13 @@ Y1_lin <- (X_mat)%*%beta + tau + rnorm(n, 0, 1)
 ```
 
 ```{r}
+X_mat <- data.frame(X_mat)
 #variables - 'beta0','Gender','Weight','Age','Size_Tumor','HBP', 'Relapse'
 #Non linear data generation process
-Y0_nl <- 0.08*X_mat[,1]^2 + X_mat[,2]^2 + 0.00002*X_mat[,3]^3 + 0.00006*X_mat[,4]^4 + 0.04*exp(X_mat[,5]) + X_mat[,6]^3 + 0.187*X_mat[,7]^3 + rnorm(n,0,1)
+Y0_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, n+3, 1))*(X_mat$Age^7) + 2*exp(X_mat$Size_Tumor) + 0.22*(X_mat$HBP^2) + X_mat$Relapse) *(10^-10) + 10*X_mat$Gender + 15*(1-X_mat$Gender) +rnorm(n,0,1)
 
-Y1_nl <- 0.08*X_mat[,1]^2 + 0.05*X_mat[,2]^2 + 0.00002*X_mat[,3]^3 + 0.00006*X_mat[,4]^4 + 0.04*exp(X_mat[,5]) + X_mat[,6]^3 + 0.187*X_mat[,7]^3 + rnorm(n,0,1) + tau
+Y1_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, n+3, 1))*(X_mat$Age^7) + 2*exp(X_mat$Size_Tumor) + 0.22*(X_mat$HBP^2) + X_mat$Relapse) *(10^-10) + 10*X_mat$Gender + 15*(1-X_mat$Gender) +rnorm(n,0,1) + tau
+
 ```
 
 
@@ -78,7 +86,7 @@ range(tau)
 ```{r}
 #'beta0','Gender','Age', 'BMI', 'Size_Tumor','HBP', 'Relapse'
 #Treatment assignment was not completely random. Targeted selection.
-q = ifelse(X_mat[,4] > 40 & X_mat[,3] < 160 & X_mat[,5] < 4 & X_mat[,7] == 0, -1, 1)
+q = ifelse(X_mat$Age > 40 & X_mat$Weight < 160 & X_mat$Size_Tumor < 4 & X_mat$Relapse == 0, -1, 1)
 pi = pnorm(q)
 treat = rbinom(n, 1, pi)
 
@@ -109,23 +117,19 @@ test_nl <- researcher_nl[-rows_nl,]
 
 
 ```{r}
-# Linear Regression with linear data
+# Linear Regression with linear data - train/test approach
 fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = train_lin)
 summary(fit_lin)
 Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
 ```
 
 ```{r}
-# Linear Regression with non linear data
-fit_nl <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = train_nl)
+# Linear Regression with non linear data- train/test approach
+fit_nl <- lm(Y ~ Gender + Age + Weight +  Size_Tumor + HBP + Relapse + treat,data = train_nl)
 summary(fit_nl)
 Yhat_nl_lr <- predict.lm(fit_nl, test_nl, type = "response")
 ```
 
-```{r}
-# Causal Forest
-
-```
 
 ```{r}
 #Causal forest with linear data
@@ -174,11 +178,11 @@ mean(tauhat_nl)
 
 ```{r}
 #Overlapping histograms of tau and estimated tau using BCF - linear data
-hist(tauhat_lin, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 2000))
+hist(tauhat_lin, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 2800))
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 
 #Overlapping histograms of tau and estimated tau using BCF - non linear data
-hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 4500), xlim = c(5, 25))
+hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 2800), xlim = c(5, 25))
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 ```
 
