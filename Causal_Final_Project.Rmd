@@ -7,6 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
 library(grf)
 library(bcf)
 library(arm)
@@ -14,7 +15,7 @@ library(mvtnorm)
 ```
 
 ```{r}
-set.seed(1234)
+set.seed(123)
 n <- 10000
 p <- 6
 ```
@@ -23,12 +24,12 @@ p <- 6
 ```{r, warning = F, show = F, message = F}
 #Create strongly confounded data
 sigma_mat <- matrix(0, 4,4)
-sigma_mat[lower.tri(sigma_mat)] <- c(0.7, 0.8, 0.65, 0.9,0.92, 0.84)
+sigma_mat[lower.tri(sigma_mat)] <- c(0.7, 0.8, 0.9, 0.9,0.92, 0.84)
 sigma_mat <- t(sigma_mat)
-sigma_mat[lower.tri(sigma_mat)] <- c(0.7, 0.8, 0.65, 0.9,0.92, 0.84)
+sigma_mat[lower.tri(sigma_mat)] <- c(0.7, 0.8, 0.9, 0.9,0.92, 0.84)
 Sigma <- t(sigma_mat) %*% sigma_mat
 Sigma <- Sigma/1.5
-diag(Sigma) <- c(20, 1, 1, 1)
+diag(Sigma) <- c(20, 10, 2, 25)
 
 #Weight, Age, Tumor Size, HBP
 Xi <- rmvnorm(n, c(170, 50, 5, 130), sigma= Sigma)
@@ -47,7 +48,7 @@ colnames(X_mat) = c('beta0','Weight','Age','Size_Tumor','HBP', 'Gender','Relapse
 
 # Parameters 
 # beta - vector of slopes to generate Y
-beta <- c(-0.98, -0.803,0.17, 0.77, 0.027, 1.18, 0.187)
+beta <- c(-0.98, 0.803,0.17, 0.77, 0.027, 1.18, 0.187)
 # vector of slopes to generate tau
 gamma <- c(16, -0.060, 0.0124, -1.523, 0.1,  0.64, 0.8)
 
@@ -68,9 +69,9 @@ Y1_lin <- (X_mat)%*%beta + tau + rnorm(n, 0, 1)
 X_mat <- data.frame(X_mat)
 #variables - 'beta0','Gender','Weight','Age','Size_Tumor','HBP', 'Relapse'
 #Non linear data generation process
-Y0_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, n+3, 1))*(X_mat$Age^7) + 2*exp(X_mat$Size_Tumor) + 0.22*(X_mat$HBP^2) + X_mat$Relapse) *(10^-10) + 10*X_mat$Gender + 15*(1-X_mat$Gender) +rnorm(n,0,1)
+Y0_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, n+3, 1))*(X_mat$Age^7) + runif(n, 2, 4)*exp(X_mat$Size_Tumor) + (sin(X_mat$HBP)^5)/0.05 + X_mat$Relapse) *(10^-10) + 10*X_mat$Gender +rnorm(n,0,1)
 
-Y1_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, n+3, 1))*(X_mat$Age^7) + 2*exp(X_mat$Size_Tumor) + 0.22*(X_mat$HBP^2) + X_mat$Relapse) *(10^-10) + 10*X_mat$Gender + 15*(1-X_mat$Gender) +rnorm(n,0,1) + tau
+Y1_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, n+3, 1))*(X_mat$Age^7) + runif(n, 2, 4)*exp(X_mat$Size_Tumor) + (sin(X_mat$HBP)^5)/0.05 + X_mat$Relapse) *(10^-10) + 10*X_mat$Gender +rnorm(n,0,1)+ tau
 
 ```
 
@@ -151,10 +152,10 @@ mean(cf.pred_nl$predictions)
 
 ```{r}
 # Bayesian Causal Forest with linear data
-fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
+fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:6]),as.matrix(researcher_lin[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
 
 # Bayesian Causal Forest with non linear data
-fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
+fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:6]),as.matrix(researcher_nl[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
 ```
 
 
@@ -164,7 +165,6 @@ tau_post_lin = fit_bayesian_lin$tau
 tauhat_lin = colMeans(tau_post_lin)
 hist(tauhat_lin)
 mean(tauhat_lin)
-
 ```
 
 ```{r}
