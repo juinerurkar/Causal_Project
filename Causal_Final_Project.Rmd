@@ -69,9 +69,9 @@ Y1_lin <- (X_mat)%*%beta + tau + rnorm(n, 0, 1)
 X_mat <- data.frame(X_mat)
 #variables - 'beta0','Gender','Weight','Age','Size_Tumor','HBP', 'Relapse'
 #Non linear data generation process
-Y0_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, n+3, 1))*(X_mat$Age^7) + runif(n, 2, 4)*exp(X_mat$Size_Tumor) + (sin(X_mat$HBP)^5)/0.05 + X_mat$Relapse) *(10^-10) + 10*X_mat$Gender +rnorm(n,0,1)
+Y0_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, 13.99, 0.01))*(X_mat$Age^6) + runif(n, 2, 4)*exp(X_mat$Size_Tumor) + (sin(X_mat$HBP)^5)/0.05 + X_mat$Relapse) *(10^-9) + 10*X_mat$Gender +rnorm(n,0,1)
 
-Y1_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, n+3, 1))*(X_mat$Age^7) + runif(n, 2, 4)*exp(X_mat$Size_Tumor) + (sin(X_mat$HBP)^5)/0.05 + X_mat$Relapse) *(10^-10) + 10*X_mat$Gender +rnorm(n,0,1)+ tau
+Y1_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(seq(4, 13.99, 0.01))*(X_mat$Age^6) + runif(n, 2, 4)*exp(X_mat$Size_Tumor) + (sin(X_mat$HBP)^5)/0.05 + X_mat$Relapse) *(10^-9) + 10*X_mat$Gender +rnorm(n,0,1)+ tau
 
 ```
 
@@ -80,7 +80,7 @@ Y1_nl <- 50 + (0.08*(X_mat$beta0) + runif(n, 0.02, 0.2)*(X_mat$Weight^3) + log(s
 #Plot tau
 hist(tau)
 mean(tau)
-#The mean value of treatment effect is 6.844
+#The mean value of treatment effect is 12.54
 range(tau)
 ```
 
@@ -122,6 +122,8 @@ test_nl <- researcher_nl[-rows_nl,]
 fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = train_lin)
 summary(fit_lin)
 Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
+plot(fit_lin$fitted.values, fit_lin$residuals)
+abline(h = 0, col="red")
 ```
 
 ```{r}
@@ -129,6 +131,8 @@ Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
 fit_nl <- lm(Y ~ Gender + Age + Weight +  Size_Tumor + HBP + Relapse + treat,data = train_nl)
 summary(fit_nl)
 Yhat_nl_lr <- predict.lm(fit_nl, test_nl, type = "response")
+plot(fit_nl$fitted.values, fit_nl$residuals)
+abline(h = 0, col="red")
 ```
 
 
@@ -182,20 +186,40 @@ hist(tauhat_lin, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 2800))
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 
 #Overlapping histograms of tau and estimated tau using BCF - non linear data
-hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 2800), xlim = c(5, 25))
+hist(tauhat_nl, col = rgb(1,0,0, alpha = 0.7), ylim = c(0, 6000), xlim = c(5, 25))
 hist(tau, col = rgb(0,0,1, alpha = 0.7), add = T)
 ```
 
 ```{r}
 #Mean difference in real and estimated individual heterogeneous treatment effects for linear data
-mean_diff_lin_bcf = mean(fit_bayesian_lin$yhat - researcher_lin$Y)
-mean_diff_lin_cf = mean(fit_cf_lin$Y.hat - train_lin$Y)
-mean_diff_lin_lr = mean(Yhat_lin_lr - test_lin$Y)
+yhat_lin_bcf = colMeans(fit_bayesian_lin$yhat)
+mean_diff_lin_bcf = sqrt(mean((yhat_lin_bcf - researcher_lin$Y)^2))
+print(mean_diff_lin_bcf)
+mean_diff_lin_cf = sqrt(mean((cf.pred_lin$predictions - test_lin$Y)^2))
+print(mean_diff_lin_cf)
+mean_diff_lin_lr = sqrt(mean((Yhat_lin_lr - test_lin$Y)^2))
+print(mean_diff_lin_lr)
 
 #Mean difference in real and estimated individual heterogeneous treatment effects for non - linear data
-mean_diff_nl_bcf = mean(fit_bayesian_nl$yhat - researcher_nl$Y)
-mean_diff_nl_cf = mean(fit_cf_nl$Y.hat - train_nl$Y)
-mean_diff_nl_lr = mean(Yhat_nl_lr - test_nl$Y)
+yhat_nl_bcf = colMeans(fit_bayesian_nl$yhat)
+mean_diff_nl_bcf = sqrt(mean((yhat_nl_bcf - researcher_nl$Y)^2))
+print(mean_diff_nl_bcf)
+mean_diff_nl_cf = sqrt(mean((cf.pred_nl$predictions - test_nl$Y)^2))
+print(mean_diff_nl_cf)
+mean_diff_nl_lr = sqrt(mean((Yhat_nl_lr - test_nl$Y)^2))
+print(mean_diff_nl_lr)
 ```
 
+```{r}
+plot(density(yhat_lin_bcf - researcher_lin$Y))
+plot(density(cf.pred_lin$predictions - test_lin$Y))
+plot(density(Yhat_lin_lr - test_lin$Y))
 
+```
+
+```{r}
+plot(density(yhat_nl_bcf - researcher_nl$Y))
+plot(density(cf.pred_nl$predictions - train_nl$Y))
+plot(density(Yhat_nl_lr - test_nl$Y))
+
+```
