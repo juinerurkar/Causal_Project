@@ -74,9 +74,9 @@ Y1_lin <- (as.matrix(X_mat))%*%beta + tau + rnorm(n, 0, 1)
 
 ```{r}
 #Non linear data generation process
-Y0_nl <- 50 + ((X_mat$Weight^3) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rbeta(n,0.5,1/3)
+Y0_nl <- 50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rbeta(n,0.5,1/3)
 
-Y1_nl <- 50 + ((X_mat$Weight^3) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rbeta(n,0.5,1/3)+ tau
+Y1_nl <- 50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rbeta(n,0.5,1/3)+ tau
 ```
 
 ```{r}
@@ -90,23 +90,23 @@ mean(tau)
 ```{r}
 #Create researcher data and god role data for the linear data
 researcher_lin  <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1_lin, Y0_lin))
-god_lin <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_lin, Y0 = Y0_lin)
+god_lin <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_lin, Y0 = Y0_lin, tau = tau)
 
 #Create researcher data and god role data for the non linear data
 researcher_nl <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1_nl, Y0_nl))
-god_nl <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_nl, Y0 = Y0_nl)
+god_nl <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_nl, Y0 = Y0_nl, tau = tau)
 ```
 
 ```{r}
 #Create train - test split for linear researcher data
 rows_lin <- sample(nrow(researcher_lin),size = 0.8*n,replace = F)
 train_lin <- researcher_lin[rows_lin,]
-test_lin <- researcher_lin[-rows_lin,]
+test_lin <- god_lin[-rows_lin,]
 
 #Create train - test split for non linear researcher data
 rows_nl <- sample(nrow(researcher_nl),size = 0.8*n,replace = F)
 train_nl <- researcher_nl[rows_nl,]
-test_nl <- researcher_nl[-rows_nl,]
+test_nl <- god_nl[-rows_nl,]
 ```
 
 ```{r}
@@ -184,38 +184,30 @@ DIAGNOSTICS:
 RMSE:
 ```{r}
 #Mean difference in real and estimated individual heterogeneous treatment effects for linear data
-mean_diff_lin_bcf = sqrt(mean((yhat_lin_bcf - researcher_lin$Y)^2))
+mean_diff_lin_bcf = sqrt(mean((tauhat_lin - tau)^2))
 print(mean_diff_lin_bcf)
-mean_diff_lin_cf = sqrt(mean((cf.pred_lin$predictions - test_lin$Y)^2))
+mean_diff_lin_cf = sqrt(mean((cf.pred_lin$predictions - test_lin$tau)^2))
 print(mean_diff_lin_cf)
-mean_diff_lin_lr = sqrt(mean((Yhat_lin_lr - test_lin$Y)^2))
-print(mean_diff_lin_lr)
 
 #Mean difference in real and estimated individual heterogeneous treatment effects for non - linear data
-mean_diff_nl_bcf = sqrt(mean((yhat_nl_bcf - researcher_nl$Y)^2))
+mean_diff_nl_bcf = sqrt(mean((tauhat_nl - tau)^2))
 print(mean_diff_nl_bcf)
-mean_diff_nl_cf = sqrt(mean((cf.pred_nl$predictions - test_nl$Y)^2))
+mean_diff_nl_cf = sqrt(mean((cf.pred_nl$predictions - test_nl$tau)^2))
 print(mean_diff_nl_cf)
-mean_diff_nl_lr = sqrt(mean((Yhat_nl_lr - test_nl$Y)^2))
-print(mean_diff_nl_lr)
 ```
 
 ```{r}
-plot(density(researcher_lin$Y - yhat_lin_bcf), main = "")
+plot(density(tau - tauhat_lin), main = "")
 title(main = "Density - Residuals for BCF using linear data")
-plot(density(test_lin$Y - cf.pred_lin$predictions ), main = "")
+plot(density(test_lin$tau - cf.pred_lin$predictions), main = "")
 title(main = "Density - Residuals for CF using linear data")
-plot(density(test_lin$Y - Yhat_lin_lr), main = "")
-title(main = "Density - Residuals for Linear regression using linear data")
 ```
 
 ```{r}
-plot(density(researcher_nl$Y - yhat_nl_bcf), main = "")
+plot(density(tau - tauhat_nl), main = "")
 title(main = "Density - Residuals for BCF using nonlinear data")
-plot(density(test_nl$Y - cf.pred_nl$predictions), main = "")
+plot(density(test_lin$tau - cf.pred_lin$predictions), main = "")
 title(main = "Density - Residuals for CF using nonlinear data")
-plot(density(test_nl$Y - Yhat_nl_lr), main = "")
-title(main = "Density - Residuals for Linear regression using nonlinear data")
 ```
 
 OVERLAPPING HISTOGRAMS FOR ACTUAL VALUES OF tau AND PREDICTED tau VALUES USING BCF
