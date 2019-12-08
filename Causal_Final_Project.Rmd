@@ -117,6 +117,11 @@ Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
 plot(fit_lin$fitted.values, fit_lin$residuals, xlab = "", ylab = "")
 abline(h = 0, col="red")
 title(main = "Diagnostic plot of residuals", xlab = "Fitted values", ylab = "Residuals")
+
+#tau estimates
+test_lin$Lr_pred = Yhat_lin_lr
+test_lin$tau_lr = ifelse(test_lin$treat == 1, test_lin$Lr_pred - test_lin$Y0, test_lin$Y1 - test_lin$Lr_pred)
+
 ```
 
 ```{r}
@@ -128,6 +133,10 @@ Yhat_nl_lr <- predict.lm(fit_nl, test_nl, type = "response")
 plot(fit_nl$fitted.values, fit_nl$residuals, xlab = "", ylab = "")
 abline(h = 0, col="red")
 title(main = "Diagnostic plot of residuals", xlab = "Fitted values", ylab = "Residuals")
+
+#tau estimates
+test_nl$Lr_pred = Yhat_nl_lr
+test_nl$tau_lr = ifelse(test_nl$treat == 1, test_nl$Lr_pred - test_nl$Y0, test_nl$Y1 - test_nl$Lr_pred)
 ```
 
 ```{r}
@@ -188,12 +197,16 @@ mean_diff_lin_bcf = sqrt(mean((tauhat_lin - tau)^2))
 print(mean_diff_lin_bcf)
 mean_diff_lin_cf = sqrt(mean((cf.pred_lin$predictions - test_lin$tau)^2))
 print(mean_diff_lin_cf)
+mean_diff_lin_lr = sqrt(mean((test_lin$tau - test_lin$tau_lr)^2))
+print(mean_diff_lin_lr)
 
 #Mean difference in real and estimated individual heterogeneous treatment effects for non - linear data
 mean_diff_nl_bcf = sqrt(mean((tauhat_nl - tau)^2))
 print(mean_diff_nl_bcf)
 mean_diff_nl_cf = sqrt(mean((cf.pred_nl$predictions - test_nl$tau)^2))
 print(mean_diff_nl_cf)
+mean_diff_nl_lr = sqrt(mean((test_nl$tau - test_nl$tau_lr)^2))
+print(mean_diff_nl_lr)
 ```
 
 ```{r}
