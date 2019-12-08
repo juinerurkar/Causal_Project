@@ -1,0 +1,177 @@
+---
+title: "Causal_Project"
+author: "Devin Khosla and Jui Nerurkar"
+date: "11/4/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(grf)
+library(bcf)
+library(arm)
+library(mvtnorm)
+```
+
+```{r}
+start.time <- Sys.time()
+
+nIter <- 1
+set.seed(123)
+n <- 10000
+p <- 6
+real_tau <- NA
+LR_lin <- NA
+residuals_LRlin <- NA
+mean_LRlin <- NA
+sd_LRlin <- NA
+mean_cflin <- NA
+sd_cflin <- NA
+mean_bcflin <- NA
+sd_bcflin <- NA
+
+LR_nl <- NA
+residuals_LRnl <- NA
+mean_LRnl <- NA
+sd_LRnl <- NA
+mean_cfnl <- NA
+sd_cfnl <- NA
+mean_bcfnl <- NA
+sd_bcfnl <- NA
+
+for(i in 1:nIter){
+  #Create strongly confounded data - variables: Weight, Age, Tumor Size and Blood Pressure
+  sigma_mat <- matrix(0, 4,4)
+  sigma_mat[lower.tri(sigma_mat)] <- c(0.7, 0.8, 0.9, 0.9,0.92, 0.84)
+  sigma_mat <- t(sigma_mat)
+  sigma_mat[lower.tri(sigma_mat)] <- c(0.7, 0.8, 0.9, 0.9,0.92, 0.84)
+  Sigma <- t(sigma_mat) %*% sigma_mat
+  Sigma <- Sigma/1.5
+  diag(Sigma) <- c(20, 10, 2, 25)
+
+  Xi <- rmvnorm(n, c(170, 50, 5, 130), sigma= Sigma)
+
+  #Create data for variables: Gender and Relapse
+  Gender <- rbinom(n, 1, 0.52)
+  #Dependent on Tumor size
+  Relapse <- rbinom(n,1,((Xi[,3]-min(Xi[,3]))/(max(Xi[,3])-min(Xi[,3]))))
+
+  #Add a first column with 1s for the intercept (beta0)
+  X_mat <- cbind(rep(1,n), Xi, Gender, Relapse)
+
+  #Add column names
+  colnames(X_mat) = c('beta0','Weight','Age','Size_Tumor','HBP', 'Gender','Relapse')
+
+  # Parameters
+  # beta - vector of slopes to generate Y
+  beta <- c(-0.98, 0.803,0.17, 0.77, 0.027, 1.18, 0.187)
+  # vector of slopes to generate tau
+  gamma <- c(16, -0.060, 0.0124, -1.523, 0.1,  0.64, 0.8)
+
+  #Generate tau
+  tau <- (X_mat)%*%gamma
+
+  #Linear data generation process
+  #Generate potential outcomes - Y0 and Y1
+  Y0_lin <- (as.matrix(X_mat))%*%beta + rnorm(n,0,1)
+  Y1_lin <- (as.matrix(X_mat))%*%beta + tau + rnorm(n, 0, 1)
+
+  #Non linear data generation process
+  Y0_nl <- 50 + (sin(X_mat[,2]^(1/3)) + (X_mat[,3]^6) + exp(X_mat[,4]) + X_mat[,5]) *(10^-9) + rbeta(n,0.5,1/3)
+
+  Y1_nl <- 50 + (sin(X_mat[,2]^(1/3)) + (X_mat[,3]^6) + exp(X_mat[,4]) + X_mat[,5]) *(10^-9) + rbeta(n,0.5,1/3) + tau
+
+  X_mat <- data.frame(X_mat)
+  #Treatment assignment was not completely random. Targeted selection.
+  q = ifelse(X_mat$Age > 40 & X_mat$Weight < 160 & X_mat$Size_Tumor < 4 & X_mat$Relapse == 0, -1, 1)
+  pi = pnorm(q)
+  treat = rbinom(n, 1, pi)
+
+  real_tau[i] <- mean(tau)
+
+  #Create researcher data and god role data for the linear data
+  researcher_lin  <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1_lin, Y0_lin))
+  god_lin <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_lin, Y0 = Y0_lin, tau = tau)
+
+  #Create researcher data and god role data for the non linear data
+  researcher_nl <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1_nl, Y0_nl))
+  god_nl <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_nl, Y0 = Y0_nl, tau = tau)
+
+  #Create train - test split for linear researcher data
+  rows_lin <- sample(nrow(researcher_lin),size = 0.8*n,replace = F)
+  train_lin <- researcher_lin[rows_lin,]
+  test_lin <- god_lin[-rows_lin,]
+
+  #Create train - test split for non linear researcher data
+  rows_nl <- sample(nrow(researcher_nl),size = 0.8*n,replace = F)
+  train_nl <- researcher_nl[rows_nl,]
+  test_nl <- god_nl[-rows_nl,]
+
+  # Linear Regression with linear data- train/test approach
+  fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = train_lin)
+
+  LR_lin[i] <- summary(fit_lin)$coef[8,1]
+  residuals_LRlin[i] <- sum((fit_lin$residuals)^2)
+  
+  Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
+ 
+  test_lin$Lr_pred <- Yhat_lin_lr
+  test_lin$tau_lr <- ifelse(test_lin$treat == 1, test_lin$Lr_pred - test_lin$Y0, test_lin$Y1 - test_lin$Lr_pred) 
+  mean_LRlin[i] <- mean(test_lin$tau_lr)
+  sd_LRlin[i] <- sd(test_lin$tau_lr)
+  
+  # Linear Regression with non linear data- train/test approach
+  fit_nl <- lm(Y ~ Gender + Age + Weight +  Size_Tumor + HBP + Relapse + treat,data = train_nl)
+  
+  LR_nl[i] <- summary(fit_nl)$coef[8,1]
+  residuals_LRnl[i] <- sum((fit_nl$residuals)^2)
+  
+  Yhat_nl_lr <- predict.lm(fit_lin, test_nl, type = "response")
+  
+  test_nl$Lr_pred <- Yhat_nl_lr
+  test_nl$tau_lr <- ifelse(test_nl$treat == 1, test_nl$Lr_pred - test_nl$Y0, test_nl$Y1 - test_nl$Lr_pred) 
+  mean_LRnl[i] <- mean(test_nl$tau_lr)
+  sd_LRnl[i] <- sd(test_nl$tau_lr)
+  
+  fit_cf_lin <- causal_forest(X = train_lin[,1:6],Y = train_lin$Y, W = train_lin$treat)
+  cf.pred_lin <- predict(fit_cf_lin, test_lin[,1:6])
+  
+  mean_cflin <- mean(cf.pred_lin$predictions)
+  sd_cflin <- sd(cf.pred_lin$predictions)
+  
+  #Causal forest with non linear data
+  fit_cf_nl <- causal_forest(X = train_nl[,1:6],Y = train_nl$Y, W = train_nl$treat)
+  cf.pred_nl <- predict(fit_cf_nl, test_nl[,1:6])
+  
+  mean_cfnl <- mean(cf.pred_nl$predictions)
+  sd_cfnl <- sd(cf.pred_nl$predictions)
+  
+  fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:6]),as.matrix(researcher_lin[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
+  tau_post_lin = fit_bayesian_lin$tau
+  tauhat_lin = colMeans(tau_post_lin)
+  
+  mean_bcflin <- mean(tauhat_lin)
+  sd_bcflin <- sd(tauhat_lin)
+  
+  # Bayesian Causal Forest with non linear data
+  fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:6]),as.matrix(researcher_nl[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
+
+  # Get posterior of treatment effects with non linear data
+  tau_post_nl = fit_bayesian_nl$tau
+  tauhat_nl = colMeans(tau_post_nl)
+  
+  mean_bcfnl <- mean(tauhat_nl)
+  sd_bcfnl <- sd(tauhat_nl)
+  
+  print(i)
+}
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+```
+
+
+
+
+
