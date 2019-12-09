@@ -16,9 +16,9 @@ library(mvtnorm)
 ```{r}
 start.time <- Sys.time()
 
-nIter <- 1
+nIter <- 2
 set.seed(123)
-n <- 10000
+n <- 500
 p <- 6
 real_tau <- NA
 LR_lin <- NA
@@ -75,27 +75,32 @@ for(i in 1:nIter){
   #Generate potential outcomes - Y0 and Y1
   Y0_lin <- (as.matrix(X_mat))%*%beta + rnorm(n,0,1)
   Y1_lin <- (as.matrix(X_mat))%*%beta + tau + rnorm(n, 0, 1)
+  
+  #Treatment assignment was not completely random. Targeted selection.
+  q_lin = ifelse(((as.matrix(X_mat))%*%beta) < 150, -1, 1)
+  pi_lin = pnorm(q_lin)
+  treat_lin = rbinom(n, 1, pi_lin)
 
-  #Non linear data generation process
-  Y0_nl <- 50 + (sin(X_mat[,2]^(1/3)) + (X_mat[,3]^6) + exp(X_mat[,4]) + X_mat[,5]) *(10^-9) + rbeta(n,0.5,1/3)
-
-  Y1_nl <- 50 + (sin(X_mat[,2]^(1/3)) + (X_mat[,3]^6) + exp(X_mat[,4]) + X_mat[,5]) *(10^-9) + rbeta(n,0.5,1/3) + tau
+  #NON LINEAR DATA GENERATION PROCESS
+  Y0_nl <- 50 + (sin(X_mat[,2]^(1/3)) + (X_mat[,3]^6) + exp(X_mat[,4]) + X_mat[,7]) *(10^-9) + rbeta(n,0.5,1/3)
+  
+  Y1_nl <- 50 + (sin(X_mat[,2]^(1/3)) + (X_mat[,3]^6) + exp(X_mat[,4]) + X_mat[,7]) *(10^-9) + rbeta(n,0.5,1/3)+ tau
 
   X_mat <- data.frame(X_mat)
   #Treatment assignment was not completely random. Targeted selection.
-  q = ifelse(X_mat$Age > 40 & X_mat$Weight < 160 & X_mat$Size_Tumor < 4 & X_mat$Relapse == 0, -1, 1)
-  pi = pnorm(q)
-  treat = rbinom(n, 1, pi)
+  q_nl = ifelse((50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9)) < 65, -1, 1)
+  pi_nl = pnorm(q_nl)
+  treat_nl = rbinom(n, 1, pi_nl)
 
   real_tau[i] <- mean(tau)
 
   #Create researcher data and god role data for the linear data
-  researcher_lin  <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1_lin, Y0_lin))
-  god_lin <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_lin, Y0 = Y0_lin, tau = tau)
-
+  researcher_lin  <- data.frame(X_mat[,-1], treat = treat_lin, Y = ifelse(treat_lin == 1, Y1_lin, Y0_lin))
+  god_lin <- data.frame(X_mat[,-1], treat = treat_lin, Y1 = Y1_lin, Y0 = Y0_lin, tau = tau)
+  
   #Create researcher data and god role data for the non linear data
-  researcher_nl <- data.frame(X_mat[,-1], treat = treat, Y = ifelse(treat == 1, Y1_nl, Y0_nl))
-  god_nl <- data.frame(X_mat[,-1], treat = treat, Y1 = Y1_nl, Y0 = Y0_nl, tau = tau)
+  researcher_nl <- data.frame(X_mat[,-1], treat = treat_nl, Y = ifelse(treat_nl == 1, Y1_nl, Y0_nl))
+  god_nl <- data.frame(X_mat[,-1], treat = treat_nl, Y1 = Y1_nl, Y0 = Y0_nl, tau = tau)
 
   #Create train - test split for linear researcher data
   rows_lin <- sample(nrow(researcher_lin),size = 0.8*n,replace = F)
@@ -136,32 +141,32 @@ for(i in 1:nIter){
   fit_cf_lin <- causal_forest(X = train_lin[,1:6],Y = train_lin$Y, W = train_lin$treat)
   cf.pred_lin <- predict(fit_cf_lin, test_lin[,1:6])
   
-  mean_cflin <- mean(cf.pred_lin$predictions)
-  sd_cflin <- sd(cf.pred_lin$predictions)
+  mean_cflin[i] <- mean(cf.pred_lin$predictions)
+  sd_cflin[i] <- sd(cf.pred_lin$predictions)
   
   #Causal forest with non linear data
   fit_cf_nl <- causal_forest(X = train_nl[,1:6],Y = train_nl$Y, W = train_nl$treat)
   cf.pred_nl <- predict(fit_cf_nl, test_nl[,1:6])
   
-  mean_cfnl <- mean(cf.pred_nl$predictions)
-  sd_cfnl <- sd(cf.pred_nl$predictions)
+  mean_cfnl[i] <- mean(cf.pred_nl$predictions)
+  sd_cfnl[i] <- sd(cf.pred_nl$predictions)
   
-  fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:6]),as.matrix(researcher_lin[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
+  fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:6]),as.matrix(researcher_lin[,1:6]), pihat = pi_lin, nburn = 2000, nsim = 2000)
   tau_post_lin = fit_bayesian_lin$tau
   tauhat_lin = colMeans(tau_post_lin)
   
-  mean_bcflin <- mean(tauhat_lin)
-  sd_bcflin <- sd(tauhat_lin)
+  mean_bcflin[i] <- mean(tauhat_lin)
+  sd_bcflin[i] <- sd(tauhat_lin)
   
   # Bayesian Causal Forest with non linear data
-  fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:6]),as.matrix(researcher_nl[,1:6]), pihat = pi, nburn = 2000, nsim = 2000)
+  fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:6]),as.matrix(researcher_nl[,1:6]), pihat = pi_nl, nburn = 2000, nsim = 2000)
 
   # Get posterior of treatment effects with non linear data
   tau_post_nl = fit_bayesian_nl$tau
   tauhat_nl = colMeans(tau_post_nl)
   
-  mean_bcfnl <- mean(tauhat_nl)
-  sd_bcfnl <- sd(tauhat_nl)
+  mean_bcfnl[i] <- mean(tauhat_nl)
+  sd_bcfnl[i] <- sd(tauhat_nl)
   
   print(i)
 }
