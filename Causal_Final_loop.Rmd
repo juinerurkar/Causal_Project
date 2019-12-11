@@ -107,14 +107,14 @@ for(i in 1:Iter){
   test_nl <- researcher_nl[-rows_nl,]
   
   ## Linear Regression with linear data - train/test approach
-  fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat + treat*Gender + treat*Relapse ,data = train_lin)
+  fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat ,data = train_lin)
   Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
   #tau estimates
   test_lin$Lr_pred = Yhat_lin_lr
   test_lin$tau_lr = ifelse(test_lin$treat == 1, test_lin$Lr_pred - test_lin$Y0, test_lin$Y1 - test_lin$Lr_pred)
 
   ## Linear Regression with non linear data- train/test approach
-  fit_nl <- lm(Y ~ Gender + Age + Weight +  Size_Tumor + HBP + Relapse + treat + treat*Gender + treat*Relapse, data = train_nl)
+  fit_nl <- lm(Y ~ Gender + Age + Weight +  Size_Tumor + HBP + Relapse + treat, data = train_nl)
   Yhat_nl_lr <- predict.lm(fit_nl, test_nl, type = "response")
   #tau estimates
   test_nl$Lr_pred = Yhat_nl_lr
