@@ -129,7 +129,7 @@ for(i in 1:Iter){
   cf.pred_nl <- predict(fit_cf_nl, test_nl[,1:6])
   
   ##Bayesian Causal Forest with linear data
-  fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:6]),as.matrix(researcher_lin[,1:6]), pihat = pi_lin, nburn = 2000, nsim = 2000)
+  fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,c(1:3,6)]),as.matrix(researcher_lin[,1:6]), pihat = pi_lin, nburn = 2000, nsim = 2000)
   # Get posterior of treatment effects with linear data
   tau_post_lin = fit_bayesian_lin$tau
   tauhat_lin = colMeans(tau_post_lin)
