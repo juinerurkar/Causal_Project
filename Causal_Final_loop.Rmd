@@ -1,0 +1,161 @@
+---
+title: "Causal_Final_loop"
+author: "Nerurkar Jui A"
+date: "12/9/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(grf)
+library(bcf)
+library(arm)
+library(mvtnorm)
+```
+
+```{r}
+start.time <- Sys.time()
+#Set seed, determine the number of observations and variables.
+set.seed(1234)
+n <- 500
+p <- 6
+Iter <- 500
+```
+
+```{r}
+#Function to create sigma matrix for mvnorm
+sigma_mvnorm = function(nrow, ncol, covariances, variances){
+  sigma_mat <- matrix(0, nrow,ncol)
+  sigma_mat[lower.tri(sigma_mat)] <- covariances
+  sigma_mat <- t(sigma_mat)
+  sigma_mat[lower.tri(sigma_mat)] <- covariances
+  diag(sigma_mat) <- variances
+  return (sigma_mat)
+}
+```
+
+```{r}
+#Mean difference in real and estimated individual heterogeneous treatment effects for linear data
+mean_diff_lin_bcf = rep(NA, Iter)
+mean_diff_lin_cf = rep(NA, Iter)
+mean_diff_lin_lr =  rep(NA, Iter)
+
+#Mean difference in real and estimated individual heterogeneous treatment effects for non - linear data
+mean_diff_nl_bcf = rep(NA, Iter)
+mean_diff_nl_cf = rep(NA, Iter)
+mean_diff_nl_lr = rep(NA, Iter)
+```
+
+
+```{r}
+for(i in 1:Iter){
+  
+  ##Generation covariates, X
+  sigma_mat = sigma_mvnorm(nrow = 4, ncol = 4, covariances = c(12.72, 5.81, 19, 3.5, 13.43, 5.65), variances = c(20, 10, 2, 25))
+  Xi <- rmvnorm(n, c(170, 50, 5, 130), sigma= sigma_mat)
+  #Create data for variables: Gender and Relapse
+  Gender <- rbinom(n, 1, 0.52)
+  #Dependent on Tumor size
+  Relapse <- rbinom(n,1,((Xi[,3]-min(Xi[,3]))/(max(Xi[,3])-min(Xi[,3]))))
+  #Add a first column with 1s for the intercept (beta0)
+  X_mat <- cbind(rep(1,n), Xi, Gender, Relapse)
+  #Add column names
+  colnames(X_mat) = c('beta0','Weight','Age','Size_Tumor','HBP', 'Gender','Relapse')
+  
+  ##Generating Tau
+  # vector of slopes to generate tau
+  gamma <- c(16, -0.060, 0.0124, -1.523, 0.1,  0.64, 0.8)
+  tau <- ((X_mat)%*%gamma)/2
+  
+  ##Generating Y
+  # beta - vector of slopes to generate Y
+  beta <- c(-0.98, 0.803,0.17, 0.77, 0.027, 1.18, 0.187)
+  
+  X_mat <- data.frame(X_mat)
+  
+  #LINEAR DATA GENERATION PROCESS 
+  #Generate potential outcomes - Y0 and Y1 
+  Y0_lin <- (as.matrix(X_mat))%*%beta + rnorm(n,0,1)
+  Y1_lin <- (as.matrix(X_mat))%*%beta + tau + rnorm(n, 0, 1)
+
+  #Treatment assignment was not completely random. Targeted selection.
+  q_lin = ifelse(((as.matrix(X_mat))%*%beta) < 150, -1, 1)
+  pi_lin = pnorm(q_lin)
+  treat_lin = rbinom(n, 1, pi_lin)
+  
+  #NON LINEAR DATA GENERATION PROCESS
+  Y0_nl <- 50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rnorm(n, 0, 1)
+  Y1_nl <- 50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rnorm(n, 0, 1) + tau
+  #Treatment assignment was not completely random. Targeted selection.
+  q_nl = ifelse((50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9)) < 65, -1, 1)
+  pi_nl = pnorm(q_nl)
+  treat_nl = rbinom(n, 1, pi_nl)
+  
+  ##Create final data
+  researcher_lin <- data.frame(X_mat[,-1], treat = treat_lin, Y = ifelse(treat_lin == 1, Y1_lin, Y0_lin), tau = tau, Y1 = Y1_lin, Y0 = Y0_lin)
+  
+  researcher_nl <- data.frame(X_mat[,-1], treat = treat_nl, Y = ifelse(treat_nl == 1, Y1_nl, Y0_nl), tau = tau, Y1 = Y1_nl, Y0 = Y0_nl)
+  
+  #Create train - test split for linear researcher data
+  rows_lin <- sample(nrow(researcher_lin),size = 0.8*n,replace = F)
+  train_lin <- researcher_lin[rows_lin,]
+  test_lin <- researcher_lin[-rows_lin,]
+
+  #Create train - test split for non linear researcher data
+  rows_nl <- sample(nrow(researcher_nl),size = 0.8*n,replace = F)
+  train_nl <- researcher_nl[rows_nl,]
+  test_nl <- researcher_nl[-rows_nl,]
+  
+  ## Linear Regression with linear data - train/test approach
+  fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat + treat*Gender + treat*Relapse ,data = train_lin)
+  Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
+  #tau estimates
+  test_lin$Lr_pred = Yhat_lin_lr
+  test_lin$tau_lr = ifelse(test_lin$treat == 1, test_lin$Lr_pred - test_lin$Y0, test_lin$Y1 - test_lin$Lr_pred)
+
+  ## Linear Regression with non linear data- train/test approach
+  fit_nl <- lm(Y ~ Gender + Age + Weight +  Size_Tumor + HBP + Relapse + treat + treat*Gender + treat*Relapse, data = train_nl)
+  Yhat_nl_lr <- predict.lm(fit_nl, test_nl, type = "response")
+  #tau estimates
+  test_nl$Lr_pred = Yhat_nl_lr
+  test_nl$tau_lr = ifelse(test_nl$treat == 1, test_nl$Lr_pred - test_nl$Y0, test_nl$Y1 - test_nl$Lr_pred)
+
+  ##Causal forest with linear data
+  fit_cf_lin <- causal_forest(X = train_lin[,1:6],Y = train_lin$Y, W = train_lin$treat)
+  cf.pred_lin <- predict(fit_cf_lin, test_lin[,1:6])
+  
+  ##Causal forest with non linear data
+  fit_cf_nl <- causal_forest(X = train_nl[,1:6],Y = train_nl$Y, W = train_nl$treat)
+  cf.pred_nl <- predict(fit_cf_nl, test_nl[,1:6])
+  
+  ##Bayesian Causal Forest with linear data
+  fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,1:6]),as.matrix(researcher_lin[,1:6]), pihat = pi_lin, nburn = 2000, nsim = 2000)
+  # Get posterior of treatment effects with linear data
+  tau_post_lin = fit_bayesian_lin$tau
+  tauhat_lin = colMeans(tau_post_lin)
+
+  ##Bayesian Causal Forest with non linear data
+  fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:6]),as.matrix(researcher_nl[,1:6]), pihat = pi_nl, nburn = 2000, nsim = 2000)
+  #Get posterior of treatment effects with non linear data
+  tau_post_nl = fit_bayesian_nl$tau
+  tauhat_nl = colMeans(tau_post_nl)
+  
+  #Mean difference in real and estimated individual heterogeneous treatment effects for linear data
+  mean_diff_lin_bcf[i] = sqrt(mean((tauhat_lin - tau)^2))
+  mean_diff_lin_cf[i] = sqrt(mean((cf.pred_lin$predictions - test_lin$tau)^2))
+  mean_diff_lin_lr[i] = sqrt(mean((test_lin$tau - test_lin$tau_lr)^2))
+
+  #Mean difference in real and estimated individual heterogeneous treatment effects for non - linear data
+  mean_diff_nl_bcf[i] = sqrt(mean((tauhat_nl - tau)^2))
+  mean_diff_nl_cf[i] = sqrt(mean((cf.pred_nl$predictions - test_nl$tau)^2))
+  mean_diff_nl_lr[i] = sqrt(mean((test_nl$tau - test_nl$tau_lr)^2))
+  }
+```
+
+```{r}
+end.time <- Sys.time()
+
+time.taken <- end.time - start.time
+```
+
+
