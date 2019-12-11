@@ -16,20 +16,25 @@ library(mvtnorm)
 ```{r}
 start.time <- Sys.time()
 #Set seed, determine the number of observations and variables.
-set.seed(123)
-n <- 500
+set.seed(1234)
+n <- 1000
 p <- 6
 ```
 
 
 ```{r, warning = F, show = F, message = F}
 #Create strongly correlated data - variables: Weight, Age, Tumor Size and Blood Pressure
-sigma_mat <- matrix(0, 4,4)
-sigma_mat[lower.tri(sigma_mat)] <- c(12.72, 5.81, 19, 3.5, 9.5, 5.65)
-sigma_mat <- t(sigma_mat)
-sigma_mat[lower.tri(sigma_mat)] <- c(12.72, 5.81, 19, 3.5, 9.5, 5.65)
+sigma_mvnorm = function(nrow, ncol, covariances, variances){
+  sigma_mat <- matrix(0, nrow,ncol)
+  sigma_mat[lower.tri(sigma_mat)] <- covariances
+  sigma_mat <- t(sigma_mat)
+  sigma_mat[lower.tri(sigma_mat)] <- covariances
+  diag(sigma_mat) <- variances
+  return (sigma_mat)
+}
 
-diag(sigma_mat) <- c(20, 10, 2, 25)
+sigma_mat = sigma_mvnorm(nrow = 4, ncol = 4, covariances = c(12.72, 5.81, 19, 3.5, 13.43, 5.65), variances = c(20, 10, 2, 25))
+
 
 Xi <- rmvnorm(n, c(170, 50, 5, 130), sigma= sigma_mat)
 
@@ -54,7 +59,7 @@ beta <- c(-0.98, 0.803,0.17, 0.77, 0.027, 1.18, 0.187)
 gamma <- c(16, -0.060, 0.0124, -1.523, 0.1,  0.64, 0.8)
 
 #Generate tau
-tau <- (X_mat)%*%gamma
+tau <- ((X_mat)%*%gamma)/2
 ```
 
 ```{r}
@@ -78,10 +83,10 @@ treat_lin = rbinom(n, 1, pi_lin)
 #NON LINEAR DATA GENERATION PROCESS
 Y0_nl <- 50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rnorm(n, 0, 1)
 
-Y1_nl <- 50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rbeta(n,0, 1)+ tau
+Y1_nl <- 50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rnorm(n, 0, 1) + tau
 
 #Treatment assignment was not completely random. Targeted selection.
-q_nl = ifelse((50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9)) < 65, -1, 1)
+q_nl = ifelse((50 + (sin(X_mat$Weight^(1/3)) + (X_mat$Age^6) + exp(X_mat$Size_Tumor) + X_mat$Relapse) *(10^-9) + rbeta(n,0.5,1/3)) < 70, -1, 1)
 pi_nl = pnorm(q_nl)
 treat_nl = rbinom(n, 1, pi_nl)
 ```
@@ -96,31 +101,77 @@ mean(tau)
 
 ```{r}
 #Create researcher data and god role data for the linear data
-researcher_lin  <- data.frame(X_mat[,-1], treat = treat_lin, Y = ifelse(treat_lin == 1, Y1_lin, Y0_lin))
+researcher_lin  <- data.frame(X_mat[,-1], treat = treat_lin, Y = ifelse(treat_lin == 1, Y1_lin, Y0_lin), tau = tau, Y1 = Y1_lin, Y0 = Y0_lin)
 god_lin <- data.frame(X_mat[,-1], treat = treat_lin, Y1 = Y1_lin, Y0 = Y0_lin, tau = tau)
 
 #Create researcher data and god role data for the non linear data
-researcher_nl <- data.frame(X_mat[,-1], treat = treat_nl, Y = ifelse(treat_nl == 1, Y1_nl, Y0_nl))
+researcher_nl <- data.frame(X_mat[,-1], treat = treat_nl, Y = ifelse(treat_nl == 1, Y1_nl, Y0_nl), tau = tau, Y1 = Y1_nl, Y0 = Y0_nl)
 god_nl <- data.frame(X_mat[,-1], treat = treat_nl, Y1 = Y1_nl, Y0 = Y0_nl, tau = tau)
 ```
+
+```{r}
+#Check for balance and overlap - LINEAR
+#Weight
+hist(researcher_lin$Weight[researcher_nl$treat == 0], col = rgb(1,0,0),main = "Overlap", xlim = c(150, 190))
+hist(researcher_lin$Weight[researcher_nl$treat == 1], col = rgb(0,0,1), add = T)
+#Age
+hist(researcher_lin$Age[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_lin$Age[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+#Tumor Size
+hist(researcher_lin$Size_Tumor[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_lin$Size_Tumor[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+#Blood Pressure
+hist(researcher_lin$HBP[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_lin$HBP[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+#Relapse
+hist(researcher_lin$Relapse[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_lin$Relapse[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+#Gender
+hist(researcher_lin$Gender[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_lin$Gender[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+
+
+#Check for balance and overlap - NON LINEAR
+#Weight
+hist(researcher_nl$Weight[researcher_nl$treat == 0], col = rgb(0,0,1), xlim = c(150, 190))
+hist(researcher_nl$Weight[researcher_nl$treat == 1], col = rgb(1,0,0), add = T)
+#Age
+hist(researcher_nl$Age[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_nl$Age[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+#Tumor Size
+hist(researcher_nl$Size_Tumor[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_nl$Size_Tumor[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+#Blood Pressure
+hist(researcher_nl$HBP[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_nl$HBP[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+#Relapse
+hist(researcher_nl$Relapse[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_nl$Relapse[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+#Gender
+hist(researcher_nl$Gender[researcher_nl$treat == 0], col = rgb(1,0,0, alpha = 0.7))
+hist(researcher_nl$Gender[researcher_nl$treat == 1], col = rgb(0,0,1, alpha = 0.7), add = T)
+
+```
+
 
 ```{r}
 #Create train - test split for linear researcher data
 rows_lin <- sample(nrow(researcher_lin),size = 0.8*n,replace = F)
 train_lin <- researcher_lin[rows_lin,]
-test_lin <- god_lin[-rows_lin,]
+test_lin <- researcher_lin[-rows_lin,]
 
 #Create train - test split for non linear researcher data
 rows_nl <- sample(nrow(researcher_nl),size = 0.8*n,replace = F)
 train_nl <- researcher_nl[rows_nl,]
-test_nl <- god_nl[-rows_nl,]
+test_nl <- researcher_nl[-rows_nl,]
 ```
 
 ```{r}
 # Linear Regression with linear data - train/test approach
-fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat,data = train_lin)
+fit_lin <- lm(Y ~ Gender + Age + Weight + Size_Tumor + HBP + Relapse + treat + treat*Gender + treat*Relapse ,data = train_lin)
 summary(fit_lin)
 Yhat_lin_lr <- predict.lm(fit_lin, test_lin, type = "response")
+
 plot(fit_lin$fitted.values, fit_lin$residuals, xlab = "", ylab = "")
 abline(h = 0, col="red")
 title(main = "Diagnostic plot of residuals", xlab = "Fitted values", ylab = "Residuals")
@@ -132,11 +183,11 @@ test_lin$tau_lr = ifelse(test_lin$treat == 1, test_lin$Lr_pred - test_lin$Y0, te
 ```
 
 ```{r}
-
 # Linear Regression with non linear data- train/test approach
-fit_nl <- lm(Y ~ Gender + Age + Weight +  Size_Tumor + HBP + Relapse + treat,data = train_nl)
+fit_nl <- lm(Y ~ Gender + Age + Weight +  Size_Tumor + HBP + Relapse + treat + treat*Gender + treat*Relapse, data = train_nl)
 summary(fit_nl)
 Yhat_nl_lr <- predict.lm(fit_nl, test_nl, type = "response")
+
 plot(fit_nl$fitted.values, fit_nl$residuals, xlab = "", ylab = "")
 abline(h = 0, col="red")
 title(main = "Diagnostic plot of residuals", xlab = "Fitted values", ylab = "Residuals")
@@ -144,6 +195,8 @@ title(main = "Diagnostic plot of residuals", xlab = "Fitted values", ylab = "Res
 #tau estimates
 test_nl$Lr_pred = Yhat_nl_lr
 test_nl$tau_lr = ifelse(test_nl$treat == 1, test_nl$Lr_pred - test_nl$Y0, test_nl$Y1 - test_nl$Lr_pred)
+
+
 ```
 
 ```{r}
