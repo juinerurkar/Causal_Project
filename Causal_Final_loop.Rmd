@@ -141,14 +141,14 @@ for(i in 1:Iter){
   tauhat_nl = colMeans(tau_post_nl)
   
   #Mean difference in real and estimated individual heterogeneous treatment effects for linear data
-  mean_diff_lin_bcf[i] = sqrt(mean((tauhat_lin - tau)^2))
-  mean_diff_lin_cf[i] = sqrt(mean((cf.pred_lin$predictions - test_lin$tau)^2))
-  mean_diff_lin_lr[i] = sqrt(mean((test_lin$tau - test_lin$tau_lr)^2))
+  mean_diff_lin_bcf[i] = sqrt(mean((tauhat_lin - tau)^2))/(sd(tauhat_lin))
+  mean_diff_lin_cf[i] = sqrt(mean((cf.pred_lin$predictions - test_lin$tau)^2))/(sd(cf.pred_lin$predictions))
+  mean_diff_lin_lr[i] = sqrt(mean((test_lin$tau - test_lin$tau_lr)^2))/(sd(test_lin$tau_lr))
 
   #Mean difference in real and estimated individual heterogeneous treatment effects for non - linear data
-  mean_diff_nl_bcf[i] = sqrt(mean((tauhat_nl - tau)^2))
-  mean_diff_nl_cf[i] = sqrt(mean((cf.pred_nl$predictions - test_nl$tau)^2))
-  mean_diff_nl_lr[i] = sqrt(mean((test_nl$tau - test_nl$tau_lr)^2))
+  mean_diff_nl_bcf[i] = sqrt(mean((tauhat_nl - tau)^2))/(sd(tauhat_nl))
+  mean_diff_nl_cf[i] = sqrt(mean((cf.pred_nl$predictions - test_nl$tau)^2))/(sd(cf.pred_nl$predictions))
+  mean_diff_nl_lr[i] = sqrt(mean((test_nl$tau - test_nl$tau_lr)^2))/(sd(test_nl$tau_lr))
   }
 ```
 
