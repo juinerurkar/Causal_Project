@@ -16,10 +16,10 @@ library(mvtnorm)
 ```{r}
 start.time <- Sys.time()
 #Set seed, determine the number of observations and variables.
-set.seed(1234)
-n <- 500
+set.seed(123)
+n <- 1000
 p <- 6
-Iter <- 500
+Iter <- 200
 ```
 
 ```{r}
@@ -62,16 +62,14 @@ for(i in 1:Iter){
   #Add column names
   colnames(X_mat) = c('beta0','Weight','Age','Size_Tumor','HBP', 'Gender','Relapse')
   
+  X_mat <- data.frame(X_mat)
+  
   ##Generating Tau
-  # vector of slopes to generate tau
-  gamma <- c(16, -0.060, 0.0124, -1.523, 0.1,  0.64, 0.8)
-  tau <- ((X_mat)%*%gamma)/2
+  tau <- (((X_mat$Weight/100)^2 + 0.02*(X_mat$Age/10)^3 + 0.001*exp(X_mat$Size_Tumor))/4) + abs(X_mat$HBP - mean(X_mat$HBP))/5 + 0.06*X_mat$Gender + 0.05*X_mat$Relapse
   
   ##Generating Y
   # beta - vector of slopes to generate Y
   beta <- c(-0.98, 0.803,0.17, 0.77, 0.027, 1.18, 0.187)
-  
-  X_mat <- data.frame(X_mat)
   
   #LINEAR DATA GENERATION PROCESS 
   #Generate potential outcomes - Y0 and Y1 
@@ -125,29 +123,29 @@ for(i in 1:Iter){
   cf.pred_lin <- predict(fit_cf_lin, test_lin[,1:6])
   
   ##Causal forest with non linear data
-  fit_cf_nl <- causal_forest(X = train_nl[,1:6],Y = train_nl$Y, W = train_nl$treat)
-  cf.pred_nl <- predict(fit_cf_nl, test_nl[,1:6])
+  fit_cf_nl <- causal_forest(X = train_nl[,c(1:3,6)],Y = train_nl$Y, W = train_nl$treat)
+  cf.pred_nl <- predict(fit_cf_nl, test_nl[,c(1:3,6)])
   
   ##Bayesian Causal Forest with linear data
-  fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,c(1:3,6)]),as.matrix(researcher_lin[,1:6]), pihat = pi_lin, nburn = 2000, nsim = 2000)
+  fit_bayesian_lin <- bcf(researcher_lin$Y, researcher_lin$treat, as.matrix(researcher_lin[,c(1:6)]),as.matrix(researcher_lin[,1:6]), pihat = pi_lin, nburn = 2000, nsim = 2000)
   # Get posterior of treatment effects with linear data
   tau_post_lin = fit_bayesian_lin$tau
   tauhat_lin = colMeans(tau_post_lin)
 
   ##Bayesian Causal Forest with non linear data
-  fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,1:6]),as.matrix(researcher_nl[,1:6]), pihat = pi_nl, nburn = 2000, nsim = 2000)
+  fit_bayesian_nl <- bcf(researcher_nl$Y, researcher_nl$treat, as.matrix(researcher_nl[,c(1:3, 6)]),as.matrix(researcher_nl[,1:6]), pihat = pi_nl, nburn = 2000, nsim = 2000)
   #Get posterior of treatment effects with non linear data
   tau_post_nl = fit_bayesian_nl$tau
   tauhat_nl = colMeans(tau_post_nl)
   
   #Mean difference in real and estimated individual heterogeneous treatment effects for linear data
-  mean_diff_lin_bcf[i] = sqrt(mean((tauhat_lin - tau)^2))/(sd(tauhat_lin))
-  mean_diff_lin_cf[i] = sqrt(mean((cf.pred_lin$predictions - test_lin$tau)^2))/(sd(cf.pred_lin$predictions))
+  mean_diff_lin_bcf[i] = sqrt(mean((tau - tauhat_lin)^2))/(sd(tauhat_lin))
+  mean_diff_lin_cf[i] = sqrt(mean((test_lin$tau - cf.pred_lin$predictions)^2))/(sd(cf.pred_lin$predictions))
   mean_diff_lin_lr[i] = sqrt(mean((test_lin$tau - test_lin$tau_lr)^2))/(sd(test_lin$tau_lr))
 
   #Mean difference in real and estimated individual heterogeneous treatment effects for non - linear data
-  mean_diff_nl_bcf[i] = sqrt(mean((tauhat_nl - tau)^2))/(sd(tauhat_nl))
-  mean_diff_nl_cf[i] = sqrt(mean((cf.pred_nl$predictions - test_nl$tau)^2))/(sd(cf.pred_nl$predictions))
+  mean_diff_nl_bcf[i] = sqrt(mean((tau - tauhat_nl)^2))/(sd(tauhat_nl))
+  mean_diff_nl_cf[i] = sqrt(mean((test_nl$tau - cf.pred_nl$predictions)^2))/(sd(cf.pred_nl$predictions))
   mean_diff_nl_lr[i] = sqrt(mean((test_nl$tau - test_nl$tau_lr)^2))/(sd(test_nl$tau_lr))
   }
 ```
@@ -156,6 +154,15 @@ for(i in 1:Iter){
 end.time <- Sys.time()
 
 time.taken <- end.time - start.time
+```
+
+```{r}
+mean(mean_diff_lin_bcf)
+mean(mean_diff_lin_cf)
+mean(mean_diff_lin_lr)
+mean(mean_diff_nl_bcf)
+mean(mean_diff_nl_cf)
+mean(mean_diff_nl_lr)
 ```
 
 
