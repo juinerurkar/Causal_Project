@@ -17,7 +17,7 @@ library(mvtnorm)
 start.time <- Sys.time()
 #Set seed, determine the number of observations and variables.
 set.seed(123)
-n <- 1000
+n <- 500
 p <- 6
 Iter <- 200
 ```
@@ -44,6 +44,14 @@ mean_diff_lin_lr =  rep(NA, Iter)
 mean_diff_nl_bcf = rep(NA, Iter)
 mean_diff_nl_cf = rep(NA, Iter)
 mean_diff_nl_lr = rep(NA, Iter)
+
+bias_lin_bcf = rep(NA, Iter)
+bias_lin_cf = rep(NA, Iter)
+bias_lin_lr = rep(NA, Iter)
+  
+bias_nl_bcf = rep(NA, Iter)
+bias_nl_cf = rep(NA, Iter)
+bias_nl_lr = rep(NA, Iter)
 ```
 
 
@@ -66,6 +74,10 @@ for(i in 1:Iter){
   
   ##Generating Tau
   tau <- (((X_mat$Weight/100)^2 + 0.02*(X_mat$Age/10)^3 + 0.001*exp(X_mat$Size_Tumor))/4) + abs(X_mat$HBP - mean(X_mat$HBP))/5 + 0.06*X_mat$Gender + 0.05*X_mat$Relapse
+  
+  #Confidence interval of tau
+  lwr = mean(tau) - 2*sd(tau)
+  upr = mean(tau) + 2*sd(tau)
   
   ##Generating Y
   # beta - vector of slopes to generate Y
@@ -147,7 +159,20 @@ for(i in 1:Iter){
   mean_diff_nl_bcf[i] = sqrt(mean((tau - tauhat_nl)^2))/(sd(tauhat_nl))
   mean_diff_nl_cf[i] = sqrt(mean((test_nl$tau - cf.pred_nl$predictions)^2))/(sd(cf.pred_nl$predictions))
   mean_diff_nl_lr[i] = sqrt(mean((test_nl$tau - test_nl$tau_lr)^2))/(sd(test_nl$tau_lr))
-  }
+  
+  ##BIAS
+  bias_lin_bcf[i] = mean(tau - tauhat_lin)/(sd(tauhat_lin))
+  bias_lin_cf[i] = mean(test_lin$tau - cf.pred_lin$predictions)/(sd(cf.pred_lin$predictions))
+  bias_lin_lr[i] = mean(test_lin$tau - test_lin$tau_lr)/(sd(test_lin$tau_lr))
+  
+  ##BIAS
+  bias_nl_bcf[i] = mean(tau - tauhat_nl)/(sd(tauhat_nl))
+  bias_nl_cf[i] = mean(test_nl$tau - cf.pred_nl$predictions)/(sd(cf.pred_nl$predictions))
+  bias_nl_lr[i] = mean(test_nl$tau - test_nl$tau_lr)/(sd(test_nl$tau_lr))
+  
+  print(i)
+}
+
 ```
 
 ```{r}
@@ -163,6 +188,13 @@ mean(mean_diff_lin_lr)
 mean(mean_diff_nl_bcf)
 mean(mean_diff_nl_cf)
 mean(mean_diff_nl_lr)
+
+mean(bias_lin_bcf)
+mean(bias_lin_cf)
+mean(bias_lin_lr)
+mean(bias_nl_bcf)
+mean(bias_nl_cf)
+mean(bias_nl_lr)
 ```
 
 
